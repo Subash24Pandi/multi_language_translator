@@ -128,7 +128,7 @@ export default function Session() {
           pending: true
         }]);
       };
-      reader.readAsArrayBuffer(wavBlob);
+      reader.readAsArrayBuffer(blob);
     } catch (err) {
       console.error('Failed to convert and send audio:', err);
       setStatus('Ready');
