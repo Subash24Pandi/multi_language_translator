@@ -200,9 +200,9 @@ async function synthesizeSpeech(text, lang) {
         transcript: text,
         voice: { mode: 'id', id: voiceId },
         output_format: {
-          container: 'raw',
+          container: 'mp3',
           encoding: 'pcm_f32le',
-          sample_rate: 22050
+          sample_rate: 44100
         },
         language: lang
       },

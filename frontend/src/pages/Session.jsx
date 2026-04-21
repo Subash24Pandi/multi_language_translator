@@ -54,30 +54,13 @@ export default function Session() {
       }]);
 
       try {
-        const binaryString = atob(data.audioBase64);
-        const len = binaryString.length;
-        const bytes = new Uint8Array(len);
-        for (let i = 0; i < len; i++) {
-          bytes[i] = binaryString.charCodeAt(i);
-        }
-        
-        // Ensure buffer length is multiple of 4 for Float32Array
-        const validLength = bytes.length - (bytes.length % 4);
-        const float32Array = new Float32Array(bytes.buffer.slice(0, validLength));
-        
-        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        const audioBuffer = audioContext.createBuffer(1, float32Array.length, 22050);
-        audioBuffer.copyToChannel(float32Array, 0);
-        
-        const source = audioContext.createBufferSource();
-        source.buffer = audioBuffer;
-        source.playbackRate.value = 0.85; // Slow down Cartesia's naturally fast speech
-        source.connect(audioContext.destination);
-        source.onended = () => {
+        const audioSrc = `data:audio/mp3;base64,${data.audioBase64}`;
+        const audio = new Audio(audioSrc);
+        audio.playbackRate = 0.85; // Slow down Cartesia's naturally fast speech
+        audio.onended = () => {
           setStatus('Ready');
-          audioContext.close();
         };
-        source.start();
+        audio.play();
       } catch (err) {
         console.error('Error playing audio:', err);
         setStatus('Ready');
