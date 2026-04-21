@@ -88,12 +88,12 @@ export async function processAudioBuffer(audioBuffer, sourceLang, targetLang, st
 
 async function transcribeAudio(audioBuffer, lang) {
   try {
-    const formData = new FormData();
-    formData.append('file', audioBuffer, {
-      filename: 'audio.wav',
-      contentType: 'audio/wav',
-      knownLength: audioBuffer.length
-    });
+    // CRITICAL FIX: Use Native Node 18+ FormData and Blob to bypass any legacy form-data npm package bugs on Render
+    const formData = new globalThis.FormData();
+    
+    // Convert the Node Buffer into a standard Web Blob
+    const audioBlob = new globalThis.Blob([audioBuffer], { type: 'audio/wav' });
+    formData.append('file', audioBlob, 'audio.wav');
     
     // Use Sarvam saaras:v3 model as requested
     formData.append('model', 'saaras:v3');
@@ -101,22 +101,25 @@ async function transcribeAudio(audioBuffer, lang) {
       formData.append('language_code', SARVAM_LANG_MAP[lang]);
     }
 
-    // CRITICAL FIX: Explicitly calculate Content-Length.
-    // If this is missing, cloud proxies (like Render -> Cloudflare) may mangle the multipart payload.
-    const contentLength = formData.getLengthSync();
-    
-    const response = await axios.post('https://api.sarvam.ai/speech-to-text', formData, {
+    // Use Native fetch which handles FormData multipart boundaries perfectly
+    const response = await fetch('https://api.sarvam.ai/speech-to-text', {
+      method: 'POST',
       headers: {
-        'api-subscription-key': process.env.SARVAM_API_KEY,
-        'Content-Length': contentLength,
-        ...formData.getHeaders()
+        'api-subscription-key': process.env.SARVAM_API_KEY
+        // Do NOT set Content-Type manually, fetch sets the boundary automatically
       },
-      timeout: 15000 
+      body: formData
     });
-    
-    return response.data.transcript || '';
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`API Error: ${response.status} ${errorText}`);
+    }
+
+    const data = await response.json();
+    return data.transcript || '';
   } catch (error) {
-    console.error('Sarvam STT Error:', error.response?.data || error.message);
+    console.error('Sarvam STT Error:', error.message);
     throw new Error('STT Failed');
   }
 }
