@@ -57,7 +57,7 @@ export function useAudioRecorder(onAudioComplete) {
         }
       };
       
-      mediaRecorder.start(); 
+      mediaRecorder.start(200);
       setIsRecording(true);
       
       const dataArray = new Uint8Array(analyser.frequencyBinCount);
