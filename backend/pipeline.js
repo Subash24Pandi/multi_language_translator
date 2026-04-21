@@ -87,16 +87,12 @@ export async function processAudioBuffer(audioBuffer, sourceLang, targetLang, st
 }
 
 async function transcribeAudio(audioBuffer, lang) {
-  let tempFilePath = '';
   try {
-    // Write buffer to a physical temporary file to ensure flawless form-data boundary parsing on Render
-    tempFilePath = path.join(os.tmpdir(), `audio_${Date.now()}_${Math.floor(Math.random()*1000)}.wav`);
-    fs.writeFileSync(tempFilePath, audioBuffer);
-
     const formData = new FormData();
-    formData.append('file', fs.createReadStream(tempFilePath), {
+    formData.append('file', audioBuffer, {
       filename: 'audio.wav',
-      contentType: 'audio/wav'
+      contentType: 'audio/wav',
+      knownLength: audioBuffer.length
     });
     
     // Use Sarvam saaras:v3 model as requested
@@ -104,21 +100,22 @@ async function transcribeAudio(audioBuffer, lang) {
     if (SARVAM_LANG_MAP[lang]) {
       formData.append('language_code', SARVAM_LANG_MAP[lang]);
     }
+
+    // CRITICAL FIX: Explicitly calculate Content-Length.
+    // If this is missing, cloud proxies (like Render -> Cloudflare) may mangle the multipart payload.
+    const contentLength = formData.getLengthSync();
     
     const response = await axios.post('https://api.sarvam.ai/speech-to-text', formData, {
       headers: {
         'api-subscription-key': process.env.SARVAM_API_KEY,
+        'Content-Length': contentLength,
         ...formData.getHeaders()
       },
-      timeout: 10000 
+      timeout: 15000 
     });
-    
-    // Clean up temp file immediately after successful upload
-    if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);
     
     return response.data.transcript || '';
   } catch (error) {
-    if (tempFilePath && fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);
     console.error('Sarvam STT Error:', error.response?.data || error.message);
     throw new Error('STT Failed');
   }
