@@ -1,7 +1,7 @@
 export async function convertBlobToWav(blob) {
   const arrayBuffer = await blob.arrayBuffer();
-  // Force sample rate to 16000Hz (optimal for STT) to drastically reduce upload size and latency
-  const audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+  // Use default system sample rate to avoid WAV header corruption during manual encoding
+  const audioContext = new (window.AudioContext || window.webkitAudioContext)();
   const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
   
   const numOfChan = audioBuffer.numberOfChannels;
