@@ -86,9 +86,10 @@ export async function processAudioBuffer(audioBuffer, sourceLang, targetLang, st
 async function transcribeAudio(audioBuffer, lang) {
   try {
     const formData = new FormData();
-    formData.append('file', Buffer.from(audioBuffer), {
+    formData.append('file', audioBuffer, {
       filename: 'audio.wav',
-      contentType: 'audio/wav'
+      contentType: 'audio/wav',
+      knownLength: audioBuffer.length
     });
     
     // Use Sarvam saaras:v3 model as requested
