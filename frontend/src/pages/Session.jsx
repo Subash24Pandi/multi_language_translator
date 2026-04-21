@@ -113,6 +113,7 @@ export default function Session() {
     setStatus('Processing...');
     
     try {
+      const wavBlob = await convertBlobToWav(blob);
       const reader = new FileReader();
       reader.onloadend = () => {
         const buffer = reader.result;
@@ -128,7 +129,7 @@ export default function Session() {
           pending: true
         }]);
       };
-      reader.readAsArrayBuffer(blob);
+      reader.readAsDataURL(wavBlob);
     } catch (err) {
       console.error('Failed to convert and send audio:', err);
       setStatus('Ready');

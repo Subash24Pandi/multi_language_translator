@@ -87,8 +87,8 @@ async function transcribeAudio(audioBuffer, lang) {
   try {
     const formData = new FormData();
     formData.append('file', Buffer.from(audioBuffer), {
-      filename: 'audio.webm',
-      contentType: 'audio/webm'
+      filename: 'audio.wav',
+      contentType: 'audio/wav'
     });
     
     // Use Sarvam saaras:v3 model as requested
