@@ -1,9 +1,10 @@
 import axios from 'axios';
 import Groq from 'groq-sdk';
-import FormData from 'form-data';
+import { execSync } from 'child_process';
+import os from 'os';
 import fs from 'fs';
 import path from 'path';
-import os from 'os';
+import FormData from 'form-data';
 import dotenv from 'dotenv';
 dotenv.config();
 
@@ -87,37 +88,50 @@ export async function processAudioBuffer(audioBuffer, sourceLang, targetLang, st
 }
 
 async function transcribeAudio(audioBuffer, lang) {
+  let webmPath = '';
+  let wavPath = '';
+  
   try {
-    // CRITICAL FIX: Use Native Node 18+ FormData and Blob to bypass any legacy form-data npm package bugs on Render
-    const formData = new globalThis.FormData();
-    
-    // The audioBuffer passed from the socket is actually a base64 string (data:audio/wav;base64,...)
-    // We MUST decode this into true binary before uploading to Sarvam!
+    // 1. Decode base64 to binary
     let base64Data = audioBuffer;
     if (typeof audioBuffer === 'string' && audioBuffer.includes(';base64,')) {
       base64Data = audioBuffer.split(';base64,').pop();
     }
     const binaryBuffer = Buffer.from(base64Data, 'base64');
     
-    // Convert the decoded binary Node Buffer into a standard Web Blob
-    const audioBlob = new globalThis.Blob([binaryBuffer], { type: 'audio/wav' });
+    // 2. Perform ultra-fast server-side conversion from WebM to strict WAV
+    // This moves the massive processing burden off the slow mobile phone and onto the cloud server
+    const tempId = `audio_${Date.now()}_${Math.floor(Math.random()*1000)}`;
+    webmPath = path.join(os.tmpdir(), `${tempId}.webm`);
+    wavPath = path.join(os.tmpdir(), `${tempId}.wav`);
+    
+    fs.writeFileSync(webmPath, binaryBuffer);
+    
+    // Use ffmpeg to convert to 16kHz mono WAV natively
+    execSync(`ffmpeg -y -i ${webmPath} -ar 16000 -ac 1 ${wavPath}`, { stdio: 'ignore' });
+    
+    const wavBuffer = fs.readFileSync(wavPath);
+    
+    // 3. Upload to Sarvam
+    const formData = new globalThis.FormData();
+    const audioBlob = new globalThis.Blob([wavBuffer], { type: 'audio/wav' });
     formData.append('file', audioBlob, 'audio.wav');
     
-    // Use Sarvam saaras:v3 model as requested
     formData.append('model', 'saaras:v3');
     if (SARVAM_LANG_MAP[lang]) {
       formData.append('language_code', SARVAM_LANG_MAP[lang]);
     }
 
-    // Use Native fetch which handles FormData multipart boundaries perfectly
     const response = await fetch('https://api.sarvam.ai/speech-to-text', {
       method: 'POST',
       headers: {
         'api-subscription-key': process.env.SARVAM_API_KEY
-        // Do NOT set Content-Type manually, fetch sets the boundary automatically
       },
       body: formData
     });
+
+    if (fs.existsSync(webmPath)) fs.unlinkSync(webmPath);
+    if (fs.existsSync(wavPath)) fs.unlinkSync(wavPath);
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -127,6 +141,8 @@ async function transcribeAudio(audioBuffer, lang) {
     const data = await response.json();
     return data.transcript || '';
   } catch (error) {
+    if (fs.existsSync(webmPath)) fs.unlinkSync(webmPath);
+    if (fs.existsSync(wavPath)) fs.unlinkSync(wavPath);
     console.error('Sarvam STT Error:', error.message);
     throw new Error('STT Failed');
   }

@@ -113,7 +113,9 @@ export default function Session() {
     setStatus('Processing...');
     
     try {
-      const wavBlob = await convertBlobToWav(blob);
+      // CRITICAL SPEED FIX: We no longer convert the audio to WAV on the phone!
+      // This completely removes the brutal 5-second freezing delay on mobile devices.
+      // We send the highly-compressed raw WebM directly to the backend.
       const reader = new FileReader();
       reader.onloadend = () => {
         const buffer = reader.result;
@@ -129,9 +131,9 @@ export default function Session() {
           pending: true
         }]);
       };
-      reader.readAsDataURL(wavBlob);
+      reader.readAsDataURL(blob);
     } catch (err) {
-      console.error('Failed to convert and send audio:', err);
+      console.error('Failed to send audio:', err);
       setStatus('Ready');
     }
   };
