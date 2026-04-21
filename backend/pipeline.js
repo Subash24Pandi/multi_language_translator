@@ -88,9 +88,6 @@ export async function processAudioBuffer(audioBuffer, sourceLang, targetLang, st
 }
 
 async function transcribeAudio(audioBuffer, lang) {
-  let webmPath = '';
-  let wavPath = '';
-  
   try {
     // 1. Decode base64 to binary
     let base64Data = audioBuffer;
@@ -99,51 +96,37 @@ async function transcribeAudio(audioBuffer, lang) {
     }
     const binaryBuffer = Buffer.from(base64Data, 'base64');
     
-    // 2. Perform ultra-fast server-side conversion from WebM to strict WAV
-    // This moves the massive processing burden off the slow mobile phone and onto the cloud server
-    const tempId = `audio_${Date.now()}_${Math.floor(Math.random()*1000)}`;
-    webmPath = path.join(os.tmpdir(), `${tempId}.webm`);
-    wavPath = path.join(os.tmpdir(), `${tempId}.wav`);
-    
-    fs.writeFileSync(webmPath, binaryBuffer);
-    
-    // Use ffmpeg to convert to 16kHz mono WAV natively
-    execSync(`ffmpeg -y -i ${webmPath} -ar 16000 -ac 1 ${wavPath}`, { stdio: 'ignore' });
-    
-    const wavBuffer = fs.readFileSync(wavPath);
-    
-    // 3. Upload to Sarvam
+    // 2. Groq Whisper natively accepts highly-compressed WebM! 
+    // We completely bypass the FFmpeg conversion step, saving even more time!
     const formData = new globalThis.FormData();
-    const audioBlob = new globalThis.Blob([wavBuffer], { type: 'audio/wav' });
-    formData.append('file', audioBlob, 'audio.wav');
+    const audioBlob = new globalThis.Blob([binaryBuffer], { type: 'audio/webm' });
+    formData.append('file', audioBlob, 'audio.webm');
     
-    formData.append('model', 'saaras:v3');
-    if (SARVAM_LANG_MAP[lang]) {
-      formData.append('language_code', SARVAM_LANG_MAP[lang]);
+    // Use Groq's ultra-fast Whisper LPU model
+    formData.append('model', 'whisper-large-v3');
+    
+    // Provide the 2-letter ISO language code (e.g., 'ta', 'te') to boost Whisper's regional accuracy
+    if (lang) {
+      formData.append('language', lang);
     }
 
-    const response = await fetch('https://api.sarvam.ai/speech-to-text', {
+    const response = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
       method: 'POST',
       headers: {
-        'api-subscription-key': process.env.SARVAM_API_KEY
+        'Authorization': `Bearer ${process.env.GROQ_API_KEY}`
       },
       body: formData
     });
 
-    if (fs.existsSync(webmPath)) fs.unlinkSync(webmPath);
-    if (fs.existsSync(wavPath)) fs.unlinkSync(wavPath);
-
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`API Error: ${response.status} ${errorText}`);
+      throw new Error(`Groq STT Error: ${response.status} ${errorText}`);
     }
 
     const data = await response.json();
-    return data.transcript || '';
+    return data.text || '';
   } catch (error) {
-    if (fs.existsSync(webmPath)) fs.unlinkSync(webmPath);
-    if (fs.existsSync(wavPath)) fs.unlinkSync(wavPath);
-    console.error('Sarvam STT Error:', error.message);
+    console.error('Groq Whisper STT Error:', error.message);
     throw new Error('STT Failed');
   }
 }
