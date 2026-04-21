@@ -91,8 +91,16 @@ async function transcribeAudio(audioBuffer, lang) {
     // CRITICAL FIX: Use Native Node 18+ FormData and Blob to bypass any legacy form-data npm package bugs on Render
     const formData = new globalThis.FormData();
     
-    // Convert the Node Buffer into a standard Web Blob
-    const audioBlob = new globalThis.Blob([audioBuffer], { type: 'audio/wav' });
+    // The audioBuffer passed from the socket is actually a base64 string (data:audio/wav;base64,...)
+    // We MUST decode this into true binary before uploading to Sarvam!
+    let base64Data = audioBuffer;
+    if (typeof audioBuffer === 'string' && audioBuffer.includes(';base64,')) {
+      base64Data = audioBuffer.split(';base64,').pop();
+    }
+    const binaryBuffer = Buffer.from(base64Data, 'base64');
+    
+    // Convert the decoded binary Node Buffer into a standard Web Blob
+    const audioBlob = new globalThis.Blob([binaryBuffer], { type: 'audio/wav' });
     formData.append('file', audioBlob, 'audio.wav');
     
     // Use Sarvam saaras:v3 model as requested
