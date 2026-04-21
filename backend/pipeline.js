@@ -1,6 +1,9 @@
 import axios from 'axios';
 import Groq from 'groq-sdk';
 import FormData from 'form-data';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
 import dotenv from 'dotenv';
 dotenv.config();
 
@@ -84,12 +87,16 @@ export async function processAudioBuffer(audioBuffer, sourceLang, targetLang, st
 }
 
 async function transcribeAudio(audioBuffer, lang) {
+  let tempFilePath = '';
   try {
+    // Write buffer to a physical temporary file to ensure flawless form-data boundary parsing on Render
+    tempFilePath = path.join(os.tmpdir(), `audio_${Date.now()}_${Math.floor(Math.random()*1000)}.wav`);
+    fs.writeFileSync(tempFilePath, audioBuffer);
+
     const formData = new FormData();
-    formData.append('file', audioBuffer, {
+    formData.append('file', fs.createReadStream(tempFilePath), {
       filename: 'audio.wav',
-      contentType: 'audio/wav',
-      knownLength: audioBuffer.length
+      contentType: 'audio/wav'
     });
     
     // Use Sarvam saaras:v3 model as requested
@@ -106,8 +113,12 @@ async function transcribeAudio(audioBuffer, lang) {
       timeout: 10000 
     });
     
+    // Clean up temp file immediately after successful upload
+    if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);
+    
     return response.data.transcript || '';
   } catch (error) {
+    if (tempFilePath && fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);
     console.error('Sarvam STT Error:', error.response?.data || error.message);
     throw new Error('STT Failed');
   }
