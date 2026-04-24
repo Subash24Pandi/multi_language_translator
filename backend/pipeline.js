@@ -159,50 +159,49 @@ async function translateText(text, sourceLang, targetLang) {
     let langStyleRule = '';
     if (targetLang === 'ta') {
       langStyleRule = `Output language: Spoken Colloquial Tamil (தமிழ்). Use Tamil script ONLY.
-Use natural everyday spoken suffixes like -ஈங்க, -ஈங்களா, -ஆச்சு. NEVER use formal written Tamil (-ீர்கள், -கிறீர்கள்).`;
+Use natural everyday spoken suffixes like -ஈங்க, -ஈங்களா.
+VOCABULARY: "Did you eat?" -> "சாப்பிட்டீங்களா?", "Are you sleeping?" -> "தூங்குறீங்களா?"`;
     } else if (targetLang === 'te') {
       langStyleRule = `Output language: Spoken Colloquial Telugu. Use Telugu script ONLY.
-Use natural everyday spoken Telugu. NEVER use formal bookish Telugu.`;
+VOCABULARY: "Did you eat?" -> "తిన్నారా?", "Are you sleeping?" -> "నిద్రపోతున్నారా?"`;
     } else if (targetLang === 'hi') {
       langStyleRule = `Output language: Spoken Colloquial Hindi. Use Devanagari script ONLY.
-Use natural everyday spoken Hindi. NEVER use formal Shuddh Hindi.`;
+VOCABULARY: "Did you eat?" -> "खाना खाया?", "Are you sleeping?" -> "सो रहे हो?"`;
     } else if (targetLang === 'kn') {
       langStyleRule = `Output language: Spoken Colloquial Kannada. Use Kannada script ONLY.
-Use natural everyday spoken Kannada. NEVER use formal bookish Kannada.`;
+VOCABULARY: "Did you eat?" -> "ಊಟ ಆಯ್ತಾ?", "Are you sleeping?" -> "ಮಲಗಿದ್ದೀರಾ?"`;
     } else if (targetLang === 'ml') {
       langStyleRule = `Output language: Spoken Colloquial Malayalam. Use Malayalam script ONLY.
-Use natural everyday spoken Malayalam. NEVER use formal Malayalam.`;
+VOCABULARY: "Did you eat?" -> "ഭക്ഷണം കഴിച്ചോ?", "Are you sleeping?" -> "ഉറങ്ങുകയാണോ?"`;
     } else if (targetLang === 'bn') {
       langStyleRule = `Output language: Spoken Colloquial Bengali. Use Bengali script ONLY.
-Use natural everyday spoken Bengali. NEVER use formal Bengali.`;
+VOCABULARY: "Did you eat?" -> "খেয়েছেন?", "Are you sleeping?" -> "ঘুমাচ্ছেন?"`;
     } else if (targetLang === 'mr') {
       langStyleRule = `Output language: Spoken Colloquial Marathi. Use Devanagari script ONLY.
-Use natural everyday spoken Marathi. NEVER use formal Marathi.`;
+VOCABULARY: "Did you eat?" -> "जेवलात का?", "Are you sleeping?" -> "झोपला आहात का?"`;
     } else if (targetLang === 'gu') {
       langStyleRule = `Output language: Spoken Colloquial Gujarati. Use Gujarati script ONLY.
-Use natural everyday spoken Gujarati. NEVER use formal Gujarati.`;
+VOCABULARY: "Did you eat?" -> "જમ્યા?", "Are you sleeping?" -> "ઊંઘો છો?"`;
     } else if (targetLang === 'or') {
       langStyleRule = `Output language: Spoken Colloquial Odia. Use Odia script ONLY.
-Use natural everyday spoken Odia. NEVER use formal Odia.`;
+VOCABULARY: "Did you eat?" -> "ଖାଇଛ?", "Are you sleeping?" -> "ଶୋଇଛ?"`;
     } else if (targetLang === 'en') {
       langStyleRule = `Output language: Clear natural conversational English.
 Use simple, polite sentences. No American slang.
 
 VOCABULARY MAPPING (CRITICAL):
-- "சாப்பிட்டீங்களா" ALWAYS means "Did you eat?" (NEVER "Are you sleeping")
-- "தூங்குறீங்களா" means "Are you sleeping?"
-- "என்ன பண்றீங்க" means "What are you doing?"
-- "கேட்குதா" means "Can you hear me?"`;
+- "சாப்பிட்டீங்களா" / "खाना खाया" / "తిన్నారా" ALWAYS means "Did you eat?"
+- "தூங்குறீங்களா" / "सो रहे हो" / "నిద్రపోతున్నారా" ALWAYS means "Are you sleeping?"`;
     }
 
     const systemPrompt = `You are a professional medical interpreter. Translate between ${sourceName} and ${targetName}.
 
 CRITICAL INSTRUCTIONS:
-1. ACCURACY: Capture the EXACT medical meaning. Do NOT skip words, do NOT summarize.
-2. CONTEXT: This is a medical emergency. Use natural, spoken colloquial language so the patient/doctor understands clearly.
-3. NO INJECTION: Do NOT add information that was not spoken. If the user says "Hello", only translate "Hello".
+1. LITERAL ACCURACY: Translate the exact words spoken. If the user says "Did you eat?", do NOT translate it as "Are you sleeping?".
+2. NO SUMMARY: Do NOT summarize. If there are 3 sentences, translate all 3 separately.
+3. NO INJECTION: Do NOT add information. If they say "Hi", only say "Hi".
 4. STYLE: ${langStyleRule}
-5. OUTPUT: Print ONLY the translated text. No labels.`;
+5. OUTPUT: Print ONLY the translated text.`;
 
     // Build messages array with few-shot examples for Tamil to lock in spoken style
     const messages = [{ role: 'system', content: systemPrompt }];
