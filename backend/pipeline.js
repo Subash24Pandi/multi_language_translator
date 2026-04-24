@@ -155,161 +155,44 @@ async function translateText(text, sourceLang, targetLang) {
     const sourceName = FULL_LANG_NAMES[sourceLang];
     const targetName = FULL_LANG_NAMES[targetLang];
     
-    let targetSpecificRules = '';
+    let langStyleRule = '';
     if (targetLang === 'ta') {
-      targetSpecificRules = `
-LANGUAGE STYLE: Spoken Colloquial Tamil (as spoken in Tamil Nadu hospitals)
-SCRIPT: Tamil script ONLY. Never write Tamil words in English letters.
-
-COLLOQUIAL WORD REPLACEMENTS (MANDATORY):
-- "சொன்னார்" → USE "சொன்னாங்க" 
-- "வந்தார்" → USE "வந்தாங்க"
-- "சாப்பிட்டீர்களா" → USE "சாப்பிட்டீங்களா" or "சாப்டீங்களா"
-- "இருக்கிறீர்களா" → USE "இருக்கீங்களா"
-- "வணக்கம்" for "Hi/Hello" → USE "ஹாய்" or "வாங்க"
-- "செய்கிறீர்கள்" → USE "பண்றீங்க"
-- "சந்திக்கலாம்" for "meet" → USE "மீட் பண்ணலாம்" or "சந்திக்கலாம்"
-- "நோய்" → USE "pain" or "வலி"
-- "உண்டீர்களா" → USE "சாப்டீங்களா"
-- "கூறுங்கள்" → USE "சொல்லுங்க"
-
-English words that are OK to keep as-is (people use these in Tamil naturally):
-Doctor, Hospital, Medicine, Tablet, Injection, BP, Sugar, Checkup, Test, Report, Scan`;
+      langStyleRule = `Output language: Spoken Colloquial Tamil (தமிழ்). Use Tamil script ONLY.
+Use natural everyday spoken suffixes like -ஈங்க, -ஈங்களா, -ஆச்சு. NEVER use formal written Tamil (-ீர்கள், -கிறீர்கள்).`;
     } else if (targetLang === 'te') {
-      targetSpecificRules = `
-LANGUAGE STYLE: Spoken Colloquial Telugu (as spoken in Andhra/Telangana hospitals)
-SCRIPT: Telugu script ONLY. Never write Telugu words in English letters.
-
-COLLOQUIAL WORD REPLACEMENTS (MANDATORY):
-- "చేస్తున్నారు" → USE "చేస్తున్నారా"
-- "వచ్చారు" → USE "వచ్చారా"
-- "తిన్నారా" → USE "తిన్నారా" (OK)
-- "అన్నారు" → USE "అన్నారు" or "చెప్పారు"
-- "ఏమి చేస్తున్నారు" → USE "ఏం చేస్తున్నారు"
-- "నమస్కారం" for Hi → USE "హాయ్" or "నమస్కారం"
-- Formal "మీరు చేయాలి" → USE "మీరు చేయండి"
-
-English words OK to keep: Doctor, Hospital, Medicine, Tablet, BP, Sugar, Scan, Report, Injection`;
-
+      langStyleRule = `Output language: Spoken Colloquial Telugu. Use Telugu script ONLY.
+Use natural everyday spoken Telugu. NEVER use formal bookish Telugu.`;
     } else if (targetLang === 'hi') {
-      targetSpecificRules = `
-LANGUAGE STYLE: Spoken Colloquial Hindi (as spoken in North India hospitals)
-SCRIPT: Devanagari script ONLY. Never write Hindi words in English letters.
-
-COLLOQUIAL WORD REPLACEMENTS (MANDATORY):
-- "आपने भोजन किया" → USE "खाना खाया?"
-- "आप क्या कर रहे हैं" → USE "क्या कर रहे हो?"
-- "नमस्ते" for Hi → USE "हाय" or "नमस्ते"
-- "मैं आपसे पूछना चाहता हूं" → USE "एक बात पूछनी थी"
-- "आप कैसे हैं" → USE "कैसे हो?" or "ठीक हो?"
-- "कृपया बताइए" → USE "बताओ" or "बताइए"
-- Formal "आपको जाना चाहिए" → USE "जाओ" or "जाइए"
-
-English words OK to keep: Doctor, Hospital, Medicine, Tablet, BP, Sugar, Test, Report, Injection`;
-
+      langStyleRule = `Output language: Spoken Colloquial Hindi. Use Devanagari script ONLY.
+Use natural everyday spoken Hindi. NEVER use formal Shuddh Hindi.`;
     } else if (targetLang === 'kn') {
-      targetSpecificRules = `
-LANGUAGE STYLE: Spoken Colloquial Kannada (as spoken in Karnataka hospitals)
-SCRIPT: Kannada script ONLY. Never write Kannada words in English letters.
-
-COLLOQUIAL WORD REPLACEMENTS (MANDATORY):
-- "ನೀವು ಏನು ಮಾಡುತ್ತಿದ್ದೀರಿ" → USE "ಏನ್ ಮಾಡ್ತಿದ್ದೀರಾ?"
-- "ಊಟ ಮಾಡಿದ್ದೀರಾ" → USE "ಊಟ ಆಯ್ತಾ?"
-- "ನಮಸ್ಕಾರ" for Hi → USE "ಹಾಯ್" or "ನಮಸ್ಕಾರ"
-- "ಅವರು ಹೇಳಿದರು" → USE "ಅವ್ರು ಏನ್ ಹೇಳಿದ್ರು?"
-- Formal "ನೀವು ಹೋಗಬೇಕು" → USE "ನೀವ್ ಹೋಗ್ಬೇಕು"
-
-English words OK to keep: Doctor, Hospital, Medicine, Tablet, BP, Sugar, Test, Report, Scan`;
-
+      langStyleRule = `Output language: Spoken Colloquial Kannada. Use Kannada script ONLY.
+Use natural everyday spoken Kannada. NEVER use formal bookish Kannada.`;
     } else if (targetLang === 'ml') {
-      targetSpecificRules = `
-LANGUAGE STYLE: Spoken Colloquial Malayalam (as spoken in Kerala hospitals)
-SCRIPT: Malayalam script ONLY. Never write Malayalam words in English letters.
-
-COLLOQUIAL WORD REPLACEMENTS (MANDATORY):
-- "നിങ്ങൾ എന്ത് ചെയ്യുന്നു" → USE "എന്ത് ചെയ്യുന്നു?"
-- "ഭക്ഷണം കഴിച്ചോ" → USE "ഭക്ഷണം കഴിച്ചോ?" (OK)
-- "നമസ്കാരം" for Hi → USE "ഹായ്" or "നമസ്കാരം"
-- "ഡോക്ടർ എന്ത് പറഞ്ഞു" → USE "Doctor എന്ത് പറഞ്ഞു?"
-- Formal "താങ്കൾ" → USE "നിങ്ങൾ"
-
-English words OK to keep: Doctor, Hospital, Medicine, Tablet, BP, Sugar, Test, Report, Scan`;
-
+      langStyleRule = `Output language: Spoken Colloquial Malayalam. Use Malayalam script ONLY.
+Use natural everyday spoken Malayalam. NEVER use formal Malayalam.`;
     } else if (targetLang === 'bn') {
-      targetSpecificRules = `
-LANGUAGE STYLE: Spoken Colloquial Bengali (as spoken in West Bengal hospitals)
-SCRIPT: Bengali script ONLY. Never write Bengali words in English letters.
-
-COLLOQUIAL WORD REPLACEMENTS (MANDATORY):
-- "আপনি কী করছেন" → USE "কী করছেন?"
-- "আপনি খেয়েছেন কি" → USE "খেয়েছেন?"
-- "নমস্কার" for Hi → USE "হ্যালো" or "নমস্কার"
-- "ডাক্তার কী বললেন" → USE "Doctor কী বললেন?"
-- Formal → USE simpler everyday spoken forms
-
-English words OK to keep: Doctor, Hospital, Medicine, Tablet, BP, Sugar, Test, Report`;
-
+      langStyleRule = `Output language: Spoken Colloquial Bengali. Use Bengali script ONLY.
+Use natural everyday spoken Bengali. NEVER use formal Bengali.`;
     } else if (targetLang === 'mr') {
-      targetSpecificRules = `
-LANGUAGE STYLE: Spoken Colloquial Marathi (as spoken in Maharashtra hospitals)
-SCRIPT: Devanagari script ONLY. Never write Marathi words in English letters.
-
-COLLOQUIAL WORD REPLACEMENTS (MANDATORY):
-- "तुम्ही काय करत आहात" → USE "काय करतोय?"
-- "तुम्ही जेवलात का" → USE "जेवलात का?"
-- "नमस्कार" for Hi → USE "हाय" or "नमस्कार"
-- "डॉक्टरांनी काय सांगितले" → USE "Doctor नी काय सांगितलं?"
-- Formal → USE simpler everyday spoken forms
-
-English words OK to keep: Doctor, Hospital, Medicine, Tablet, BP, Sugar, Test, Report`;
-
+      langStyleRule = `Output language: Spoken Colloquial Marathi. Use Devanagari script ONLY.
+Use natural everyday spoken Marathi. NEVER use formal Marathi.`;
     } else if (targetLang === 'gu') {
-      targetSpecificRules = `
-LANGUAGE STYLE: Spoken Colloquial Gujarati (as spoken in Gujarat hospitals)
-SCRIPT: Gujarati script ONLY. Never write Gujarati words in English letters.
-
-COLLOQUIAL WORD REPLACEMENTS (MANDATORY):
-- "તમે શું કરી રહ્યા છો" → USE "શું કરો છો?"
-- "તમે જમ્યા" → USE "જમ્યા?"
-- "નમસ્તે" for Hi → USE "હાય" or "નમસ્તે"
-- "ડૉક્ટરે શું કહ્યું" → USE "Doctor એ શું કીધું?"
-- Formal → USE simpler everyday spoken forms
-
-English words OK to keep: Doctor, Hospital, Medicine, Tablet, BP, Sugar, Test, Report`;
-
+      langStyleRule = `Output language: Spoken Colloquial Gujarati. Use Gujarati script ONLY.
+Use natural everyday spoken Gujarati. NEVER use formal Gujarati.`;
     } else if (targetLang === 'or') {
-      targetSpecificRules = `
-LANGUAGE STYLE: Spoken Colloquial Odia (as spoken in Odisha hospitals)
-SCRIPT: Odia script ONLY. Never write Odia words in English letters.
-
-COLLOQUIAL WORD REPLACEMENTS (MANDATORY):
-- "ଆପଣ କ'ଣ କରୁଛନ୍ତି" → USE "କ'ଣ କରୁଛ?"
-- "ଆପଣ ଖାଇଛନ୍ତି" → USE "ଖାଇଛ?"
-- "ନମସ୍କାର" for Hi → USE "ହାୟ" or "ନମସ୍କାର"
-- Formal → USE simpler everyday spoken forms
-
-English words OK to keep: Doctor, Hospital, Medicine, Tablet, BP, Sugar, Test, Report`;
-
+      langStyleRule = `Output language: Spoken Colloquial Odia. Use Odia script ONLY.
+Use natural everyday spoken Odia. NEVER use formal Odia.`;
     } else if (targetLang === 'en') {
-      targetSpecificRules = `
-LANGUAGE STYLE: Clear, natural, polite conversational Indian English (as spoken in Indian hospitals).
-Use simple sentences. No American slang. No abbreviations.
-Sound like a kind, educated Indian doctor or nurse speaking to a patient.
-Examples:
-- "வாங்க சார்" → "Please come, sir"
-- "என்ன ஆச்சு?" → "What happened?"
-- "சாப்பிட்டீங்களா?" → "Did you eat?"
-- "வலி இருக்கா?" → "Are you in pain?"
-- "Doctor என்ன சொன்னாங்க?" → "What did the doctor say?"`;
+      langStyleRule = `Output language: Clear natural conversational English.
+Use simple, polite sentences like a kind Indian doctor/nurse would speak. No American slang.`;
     }
 
-    const systemPrompt = `You are a highly accurate medical interpreter for Indian hospitals. 
-Your job is to translate spoken conversation between doctors and patients from ${sourceName} to ${targetName}.
+    const systemPrompt = `You are a medical interpreter. Translate the message from ${sourceName} to ${targetName}.
 
-CRITICAL RULES:
-1. Translate the EXACT meaning of every word. Do NOT add, remove, or change any part of the message.
-2. ${targetSpecificRules}
-3. Output ONLY the translated text. No explanations, no notes, nothing else.`;
+RULE 1 — ACCURACY (MOST IMPORTANT): Translate EXACTLY what was said. Every word must have the same meaning in the output. Do NOT add, remove, guess, or change any part of the message.
+RULE 2 — STYLE: ${langStyleRule}
+RULE 3 — OUTPUT: Print ONLY the translated sentence. Nothing else.`;
 
     const response = await groq.chat.completions.create({
       messages: [
