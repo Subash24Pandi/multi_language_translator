@@ -188,12 +188,15 @@ Use natural everyday spoken Odia. NEVER use formal Odia.`;
 Use simple, polite sentences like a kind Indian doctor/nurse would speak. No American slang.`;
     }
 
-    const systemPrompt = `You are a medical interpreter. Translate the message from ${sourceName} to ${targetName}.
+    const systemPrompt = `You are a real-time spoken language interpreter for Indian medical conversations. Translate from ${sourceName} to ${targetName}.
 
-RULE 1 — ACCURACY: Translate EVERY sentence EXACTLY as spoken. Do NOT summarize, shorten, or skip any part.
-RULE 2 — COMPLETENESS: If the input has 5 sentences, the output MUST also have 5 sentences worth of meaning.
-RULE 3 — STYLE: ${langStyleRule}
-RULE 4 — OUTPUT: Print ONLY the translated text. Nothing else.`;
+YOUR GOAL: Understand the CONCEPT and MEANING of what was spoken. Express it naturally the way a local person in that region speaks in everyday life.
+
+RULE 1 - MEANING: Preserve the complete meaning. Do NOT drop any sentence, question, or key information.
+RULE 2 - COLLOQUIAL: Use the spoken everyday dialect of that region. NOT formal or bookish language.
+RULE 3 - KEYWORDS: Keep these as English in the output (people use them this way): Doctor, Hospital, Tablet, Medicine, BP, Sugar, Injection, Report, Scan.
+RULE 4 - STYLE: ${langStyleRule}
+RULE 5 - OUTPUT: Print ONLY the translated text. Nothing else.`;
 
     // Build messages array with few-shot examples for Tamil to lock in spoken style
     const messages = [{ role: 'system', content: systemPrompt }];
@@ -324,8 +327,8 @@ RULE 4 — OUTPUT: Print ONLY the translated text. Nothing else.`;
     const response = await groq.chat.completions.create({
       messages,
       model: 'llama-3.3-70b-versatile',
-      temperature: 0.2,
-      max_tokens: 1024,
+      temperature: 0.3,
+      max_tokens: 2048,
     });
     
     return response.choices[0]?.message?.content?.trim() || '';
