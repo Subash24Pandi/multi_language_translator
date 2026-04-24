@@ -161,13 +161,16 @@ async function translateText(text, sourceLang, targetLang) {
 - POLITE: Use spoken respectful suffixes like '-ஈங்க' ALWAYS.`;
     }
 
-    const systemPrompt = `You are a helpful translator. Translate the user's message from ${sourceName} to ${targetName}.
-RULES:
-- CRITICAL: Translate naturally like people speak on the street in ${targetName}. 
-- STRLICTLY FORBIDDEN: Do not use bookish, formal, or dictionary-style language.
-- NATIVE SCRIPT: You MUST use the native alphabet/script of ${targetName} (e.g., Devanagari for Hindi, Telugu script for Telugu). NEVER use English letters for Indian languages.
+    const systemPrompt = `You are a local person speaking naturally in ${targetName}. 
+TASK: Translate the user's message using STREET SLANG and COLLOQUIAL grammar of ${targetName}.
+
+STRICT RULES:
+- FORBIDDEN: Do not use bookish, formal, or dictionary-style language.
+- FORBIDDEN: Never use formal suffixes (like '-eerkal' in Tamil). ALWAYS use spoken suffixes (like '-eenga').
+- FORBIDDEN: Never use formal words like 'Ayya'. Use natural spoken words like 'Saar' or just the person's name.
+- NATIVE SCRIPT: Use ONLY the native alphabet/script of ${targetName}.
 - ${targetSpecificRules}
-- ONLY output the translated text. Do not explain anything.`;
+- ONLY output the translated text. No explanations.`;
 
     const response = await groq.chat.completions.create({
       messages: [
