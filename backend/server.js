@@ -62,8 +62,8 @@ io.on('connection', (socket) => {
       if (!currentUser) return;
       
       const users = Object.entries(session.users);
-      // Find the user with the OPPOSITE role (Doctor -> Patient, or Patient -> Doctor)
-      const otherUserEntry = users.find(([id, user]) => user.role !== currentUser.role);
+      // Find the user with the OPPOSITE role and DIFFERENT ID
+      const otherUserEntry = users.find(([id, user]) => id !== socket.id && user.role !== currentUser.role);
       
       if (!otherUserEntry) {
          console.log('No other user in session to translate for.');

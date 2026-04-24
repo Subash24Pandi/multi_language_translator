@@ -188,16 +188,11 @@ Use simple, polite sentences. No American slang.
 IMPORTANT: ALWAYS output in English. NEVER use Indian regional scripts.`;
     }
 
-    const systemPrompt = `You are a world-class medical translator. 
-Task: Translate from ${sourceName} to ${targetName}.
-
-RULES:
-1. TARGET ONLY: You MUST output in ${targetName} language and script. 
-2. NO SOURCE: NEVER output in the source language ${sourceName} or its script.
-3. ZERO INJECTION: Translate ONLY what was said. Do NOT add times, dates, or details.
-4. MEDICAL FIDELITY: Keep terms like Doctor, Hospital, BP, Sugar, Tablet in English.
-5. STYLE: ${langStyleRule}
-6. CLEAN: No labels. No explanations. ONLY translation.`;
+    const systemPrompt = `Translate from ${sourceName} to ${targetName}.
+Output ONLY the ${targetName} translation. 
+NEVER use ${sourceName} words or script. 
+NEVER add extra info.
+MEDICAL CONTEXT: Keep BP, Sugar, Tablet, Doctor, Hospital in English.`;
 
     // Build messages array with few-shot examples for Tamil to lock in spoken style
     const messages = [{ role: 'system', content: systemPrompt }];
@@ -287,14 +282,10 @@ RULES:
       messages.push({ role: 'user', content: 'I have a headache, did you eat?' });
       messages.push({ role: 'assistant', content: 'ମୁଣ୍ଡ ଯନ୍ତ୍ରଣା ହେଉଛି, ଖାଇଛ?' });
     } else if (targetLang === 'en') {
-      messages.push({ role: 'user', content: 'ஹாய் சார், உங்களுக்கு கேட்குதா சார்? என்ன பண்றீங்க?' });
-      messages.push({ role: 'assistant', content: 'Hi sir, can you hear me sir? What are you doing?' });
-      messages.push({ role: 'user', content: 'சாப்பிட்டீங்களா? தூங்குறீங்களா?' });
-      messages.push({ role: 'assistant', content: 'Did you eat? Are you sleeping?' });
-      messages.push({ role: 'user', content: 'தலை வலிக்குது, சாப்பிடல, Doctor என்ன சொன்னாங்க?' });
-      messages.push({ role: 'assistant', content: 'I have a headache, I have not eaten. What did the doctor say?' });
-      messages.push({ role: 'user', content: 'ரெஸ்ட் எடுங்க, தண்ணி குடிங்க.' });
-      messages.push({ role: 'assistant', content: 'Please rest and drink water.' });
+      messages.push({ role: 'user', content: 'ஹாய், எப்படி இருக்கீங்க?' });
+      messages.push({ role: 'assistant', content: 'Hi, how are you?' });
+      messages.push({ role: 'user', content: 'சாப்ட்டீங்களா?' });
+      messages.push({ role: 'assistant', content: 'Did you eat?' });
     }
     
     messages.push({ role: 'user', content: text });
