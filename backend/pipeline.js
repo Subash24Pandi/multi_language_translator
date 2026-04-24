@@ -160,6 +160,8 @@ async function translateText(text, sourceLang, targetLang) {
     if (targetLang === 'ta') {
       langStyleRule = `Output language: Spoken Colloquial Tamil (தமிழ்). Use Tamil script ONLY.
 Use natural everyday spoken suffixes like -ஈங்க, -ஈங்களா.
+- "Can you hear me?" ALWAYS translates to "நான் பேசுறது கேக்குதா?" or "கேக்குதா?"
+- NEVER use formal "கேட்கிறீர்களா" or "கேட்கலாமா".
 VOCABULARY: "Did you eat?" -> "சாப்பிட்டீங்களா?", "Are you sleeping?" -> "தூங்குறீங்களா?"`;
     } else if (targetLang === 'te') {
       langStyleRule = `Output language: Spoken Colloquial Telugu. Use Telugu script ONLY.
@@ -210,6 +212,8 @@ CRITICAL INSTRUCTIONS:
       // Few-shot examples: show the model EXACTLY what spoken Tamil looks like
       messages.push({ role: 'user', content: 'Hello, how are you sir?' });
       messages.push({ role: 'assistant', content: 'ஹலோ, எப்படி இருக்கீங்க சார்?' });
+      messages.push({ role: 'user', content: 'Hi, can you hear me?' });
+      messages.push({ role: 'assistant', content: 'ஹாய், நான் பேசுறது கேக்குதா?' });
       messages.push({ role: 'user', content: 'What are you doing?' });
       messages.push({ role: 'assistant', content: 'என்ன பண்றீங்க?' });
       messages.push({ role: 'user', content: 'Did you eat?' });
@@ -220,9 +224,6 @@ CRITICAL INSTRUCTIONS:
       messages.push({ role: 'assistant', content: 'Doctor என்ன சொன்னாங்க?' });
       messages.push({ role: 'user', content: 'Please take rest and drink water.' });
       messages.push({ role: 'assistant', content: 'ரெஸ்ட் எடுங்க, தண்ணி குடிங்க.' });
-      // Long multi-sentence example to prevent summarization
-      messages.push({ role: 'user', content: 'Sir, you told me yesterday that we could meet tomorrow morning. Can you tell me what time I should come? The doctor also told me that we need to meet. I will go see the doctor and buy my tablets. If you tell me the time, we can meet at your place.' });
-      messages.push({ role: 'assistant', content: 'சார், நேத்து நாளைக்கு காலையிலே மீட் பண்ணலாம்னு சொன்னீங்க. நான் எத்தனை மணிக்கு வரணும்னு சொல்லுங்க சார். Doctor-உம் நாம் மீட் பண்ணணும்னு சொன்னாங்க. நான் Doctor-கிட்ட போய் பாத்துட்டு மருந்து வாங்கிட்டு வருவேன். நீங்க டைம் சொன்னா, உங்க வீட்ல மீட் பண்ணலாம்.' });
     } else if (targetLang === 'hi') {
       messages.push({ role: 'user', content: 'Hello, how are you sir?' });
       messages.push({ role: 'assistant', content: 'हेलो, कैसे हो सर?' });
