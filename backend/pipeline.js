@@ -101,11 +101,9 @@ async function transcribeAudio(audioBuffer, lang) {
   
   try {
     // 1. Decode base64 to binary
-    const binaryBuffer = Buffer.isBuffer(audioBuffer) ? audioBuffer : Buffer.from(audioBuffer);
-
     const deepgramLang = DEEPGRAM_LANG_MAP[lang] || 'en-US';
     const response = await axios.post(
-      `https://api.deepgram.com/v1/listen?language=${deepgramLang}&smart_format=true&filler_words=true`,
+      `https://api.deepgram.com/v1/listen?model=general&language=${deepgramLang}&smart_format=true&filler_words=true`,
       binaryBuffer,
       {
         headers: {
