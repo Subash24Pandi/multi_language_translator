@@ -285,7 +285,7 @@ RULE 5 - OUTPUT: Print ONLY the translated text. Nothing else.`;
 
     const response = await groq.chat.completions.create({
       messages,
-      model: 'llama-3.1-8b-instant',
+      model: 'llama-3.3-70b-versatile',
       temperature: 0.1,
       max_tokens: 2048,
     });
