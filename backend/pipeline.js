@@ -156,16 +156,16 @@ async function translateText(text, sourceLang, targetLang) {
     let targetSpecificRules = '';
     if (targetLang === 'ta') {
       targetSpecificRules = `
-- CRITICAL: Use "Spoken Tamil" (Colloquial). 
-- FORBIDDEN: Do not use bookish/formal/pure Tamil (No 'Thuya Tamil').
-- STYLE: Use natural spoken grammar and phonetic spellings (e.g., use "Vanga", "Sapteengala", "Erukkeenga"). 
-- POLITE: Use spoken respectful suffixes like '-eenga' ALWAYS.`;
+- CRITICAL: Use Native Tamil Script (தமிழ்). NEVER use English letters.
+- STYLE: Use spoken grammar (e.g., "சாப்டீங்களா", "எப்படி இருக்கீங்க", "வாங்க").
+- POLITE: Use spoken respectful suffixes like '-ஈங்க' ALWAYS.`;
     }
 
     const systemPrompt = `You are a helpful translator. Translate the user's message from ${sourceName} to ${targetName}.
 RULES:
 - CRITICAL: Translate naturally like people speak on the street in ${targetName}. 
 - STRLICTLY FORBIDDEN: Do not use bookish, formal, or dictionary-style language.
+- NATIVE SCRIPT: You MUST use the native alphabet/script of ${targetName} (e.g., Devanagari for Hindi, Telugu script for Telugu). NEVER use English letters for Indian languages.
 - ${targetSpecificRules}
 - ONLY output the translated text. Do not explain anything.`;
 
