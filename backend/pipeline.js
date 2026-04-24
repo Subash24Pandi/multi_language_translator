@@ -1,6 +1,5 @@
 import axios from 'axios';
 import Groq from 'groq-sdk';
-import { execSync } from 'child_process';
 import os from 'os';
 import fs from 'fs';
 import path from 'path';
@@ -21,6 +20,19 @@ const VOICE_MAP = {
   mr: '5c32dce6-936a-4892-b131-bafe474afe5f',
   ml: '374b80da-e622-4dfc-90f6-1eeb13d331c9',
   or: 'faf0731e-dfb9-4cfc-8119-259a79b27e12', // Fallback to Hindi voice for Odia script
+};
+
+const DEEPGRAM_LANG_MAP = {
+  en: 'en-IN',
+  hi: 'hi',
+  ta: 'ta',
+  te: 'te',
+  kn: 'kn',
+  ml: 'ml',
+  bn: 'bn',
+  mr: 'mr',
+  gu: 'gu',
+  or: 'or',
 };
 
 const SARVAM_LANG_MAP = {
@@ -88,64 +100,41 @@ export async function processAudioBuffer(audioBuffer, sourceLang, targetLang, st
 }
 
 async function transcribeAudio(audioBuffer, lang) {
-  let webmPath = '';
-  let wavPath = '';
-  
   try {
-    // 1. Decode base64 to binary
+    // Decode base64 to binary
     let base64Data = audioBuffer;
     if (typeof audioBuffer === 'string' && audioBuffer.includes(';base64,')) {
       base64Data = audioBuffer.split(';base64,').pop();
     }
     const binaryBuffer = Buffer.from(base64Data, 'base64');
-    
-    // 2. Convert WebM to WAV (Sarvam requires WAV format - MP3 causes broken transcription)
-    const tempId = `audio_${Date.now()}_${Math.floor(Math.random()*1000)}`;
-    webmPath = path.join(os.tmpdir(), `${tempId}.webm`);
-    const wavPath = path.join(os.tmpdir(), `${tempId}.wav`);
-    
-    fs.writeFileSync(webmPath, binaryBuffer);
-    
-    // WAV at 16kHz mono - exactly what Sarvam saaras:v3 requires
-    execSync(`ffmpeg -y -i ${webmPath} -ar 16000 -ac 1 -sample_fmt s16 ${wavPath}`, { stdio: 'ignore' });
-    
-    const wavBuffer = fs.readFileSync(wavPath);
-    
-    // 3. Upload to Sarvam
-    const formData = new globalThis.FormData();
-    const audioBlob = new globalThis.Blob([wavBuffer], { type: 'audio/wav' });
-    formData.append('file', audioBlob, 'audio.wav');
-    
-    formData.append('model', 'saaras:v3');
-    if (SARVAM_LANG_MAP[lang]) {
-      formData.append('language_code', SARVAM_LANG_MAP[lang]);
-    }
-    formData.append('with_timestamps', 'false');
-    formData.append('with_disfluencies', 'false');
 
-    const response = await fetch('https://api.sarvam.ai/speech-to-text', {
-      method: 'POST',
-      headers: {
-        'api-subscription-key': process.env.SARVAM_API_KEY
-      },
-      body: formData
+    // Deepgram accepts WebM directly — no ffmpeg conversion needed
+    const langCode = DEEPGRAM_LANG_MAP[lang] || 'en-IN';
+    const params = new URLSearchParams({
+      model: 'nova-3',
+      language: langCode,
+      smart_format: 'true',
+      punctuate: 'true',
     });
 
-    if (fs.existsSync(webmPath)) fs.unlinkSync(webmPath);
-    if (fs.existsSync(wavPath)) fs.unlinkSync(wavPath);
+    const response = await fetch(`https://api.deepgram.com/v1/listen?${params}`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Token ${process.env.DEEPGRAM_API_KEY}`,
+        'Content-Type': 'audio/webm',
+      },
+      body: binaryBuffer,
+    });
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`API Error: ${response.status} ${errorText}`);
+      throw new Error(`Deepgram Error: ${response.status} ${errorText}`);
     }
 
     const data = await response.json();
-    return data.transcript || '';
+    return data?.results?.channels?.[0]?.alternatives?.[0]?.transcript || '';
   } catch (error) {
-    if (fs.existsSync(webmPath)) fs.unlinkSync(webmPath);
-    const tempWavPath = webmPath ? webmPath.replace('.webm', '.wav') : '';
-    if (tempWavPath && fs.existsSync(tempWavPath)) fs.unlinkSync(tempWavPath);
-    console.error('Sarvam STT Error:', error.message);
+    console.error('Deepgram STT Error:', error.message);
     throw new Error('STT Failed');
   }
 }
