@@ -156,21 +156,55 @@ async function translateText(text, sourceLang, targetLang) {
     let targetSpecificRules = '';
     if (targetLang === 'ta') {
       targetSpecificRules = `
-- CRITICAL: Use Native Tamil Script (தமிழ்). NEVER use English letters.
-- STYLE: Use spoken grammar (e.g., "சாப்டீங்களா", "எப்படி இருக்கீங்க", "வாங்க").
-- POLITE: Use spoken respectful suffixes like '-ஈங்க' ALWAYS.`;
+- Use Colloquial Spoken Tamil. NEVER use Thuya/formal Tamil.
+- Use spoken suffixes like '-ீங்க', '-ீங்களா'. NEVER use '-ீர்கள்', '-கிறீர்கள்'.
+- Use common Tamil words people say in daily life (e.g., "வாங்க", "சாப்டீங்களா", "எப்படி இருக்கீங்க").
+- Write ONLY in Tamil script (தமிழ்). No English letters.`;
+    } else if (targetLang === 'te') {
+      targetSpecificRules = `
+- Use natural spoken Telugu. NEVER use formal/bookish Telugu.
+- Write ONLY in Telugu script. No English letters.`;
+    } else if (targetLang === 'hi') {
+      targetSpecificRules = `
+- Use casual everyday spoken Hindi. NEVER use formal Shuddh Hindi.
+- Write ONLY in Devanagari script. No English letters.`;
+    } else if (targetLang === 'kn') {
+      targetSpecificRules = `
+- Use natural spoken Kannada. NEVER use formal/bookish Kannada.
+- Write ONLY in Kannada script. No English letters.`;
+    } else if (targetLang === 'ml') {
+      targetSpecificRules = `
+- Use natural spoken Malayalam. NEVER use formal Malayalam.
+- Write ONLY in Malayalam script. No English letters.`;
+    } else if (targetLang === 'bn') {
+      targetSpecificRules = `
+- Use natural spoken Bengali. NEVER use formal Bengali.
+- Write ONLY in Bengali script. No English letters.`;
+    } else if (targetLang === 'mr') {
+      targetSpecificRules = `
+- Use natural spoken Marathi. NEVER use formal Marathi.
+- Write ONLY in Devanagari script. No English letters.`;
+    } else if (targetLang === 'gu') {
+      targetSpecificRules = `
+- Use natural spoken Gujarati. NEVER use formal Gujarati.
+- Write ONLY in Gujarati script. No English letters.`;
+    } else if (targetLang === 'or') {
+      targetSpecificRules = `
+- Use natural spoken Odia. NEVER use formal Odia.
+- Write ONLY in Odia script. No English letters.`;
+    } else if (targetLang === 'en') {
+      targetSpecificRules = `
+- Use clear, natural, polite conversational English.
+- DO NOT use American slang, hip-hop slang, or abbreviations (No 'whassup', 'dude', 'ya', 'u', 'chill pill').
+- Sound like a normal, educated person speaking kindly to a patient.`;
     }
 
-    const systemPrompt = `You are a local person speaking naturally in ${targetName}. 
-TASK: Translate the user's message using STREET SLANG and COLLOQUIAL grammar of ${targetName}.
+    const systemPrompt = `You are a professional medical interpreter translating from ${sourceName} to ${targetName}.
 
-STRICT RULES:
-- FORBIDDEN: Do not use bookish, formal, or dictionary-style language.
-- FORBIDDEN: Never use formal suffixes (like '-eerkal' in Tamil). ALWAYS use spoken suffixes (like '-eenga').
-- FORBIDDEN: Never use formal words like 'Ayya'. Use natural spoken words like 'Saar' or just the person's name.
-- NATIVE SCRIPT: Use ONLY the native alphabet/script of ${targetName}.
-- ${targetSpecificRules}
-- ONLY output the translated text. No explanations.`;
+RULES:
+1. Translate the EXACT meaning. Do not add, remove, or change the message intent.
+2. ${targetSpecificRules}
+3. Output ONLY the translated text. No explanations or extra words.`;
 
     const response = await groq.chat.completions.create({
       messages: [
