@@ -54,9 +54,9 @@ export default function Session() {
       }]);
 
       try {
-        const audioSrc = `data:audio/mp3;base64,${data.audioBase64}`;
+        const audioSrc = `data:audio/wav;base64,${data.audioBase64}`;
         const audio = new Audio(audioSrc);
-        audio.playbackRate = 0.85; // Slow down Cartesia's naturally fast speech
+        audio.playbackRate = 1.0; // Normal speed
         audio.onended = () => {
           setStatus('Ready');
         };

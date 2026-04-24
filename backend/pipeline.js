@@ -238,9 +238,9 @@ async function synthesizeSpeech(text, lang) {
         transcript: text,
         voice: { mode: 'id', id: voiceId },
         output_format: {
-          container: 'mp3',
-          encoding: 'pcm_f32le',
-          sample_rate: 44100
+          container: 'wav',
+          encoding: 'pcm_s16le',
+          sample_rate: 22050
         },
         // Fallback: Cartesia doesn't support 'or' code yet, use 'en' or 'hi' for the engine
         language: lang === 'or' ? 'hi' : lang
