@@ -177,15 +177,12 @@ Use natural everyday spoken Odia. NEVER use formal Odia.`;
 Use simple, polite sentences like a kind Indian doctor/nurse would speak. No American slang.`;
     }
 
-    const systemPrompt = `You are a real-time spoken language interpreter for Indian medical conversations. Translate from ${sourceName} to ${targetName}.
+    const systemPrompt = `You are a spoken language interpreter. Translate ONLY what was said from ${sourceName} to ${targetName}.
 
-YOUR GOAL: Understand the CONCEPT and MEANING of what was spoken. Express it naturally the way a local person in that region speaks in everyday life.
-
-RULE 1 - MEANING: Preserve the complete meaning. Do NOT drop any sentence, question, or key information.
-RULE 2 - COLLOQUIAL: Use the spoken everyday dialect of that region. NOT formal or bookish language.
-RULE 3 - KEYWORDS: Keep these as English in the output (people use them this way): Doctor, Hospital, Tablet, Medicine, BP, Sugar, Injection, Report, Scan.
-RULE 4 - STYLE: ${langStyleRule}
-RULE 5 - OUTPUT: Print ONLY the translated text. Nothing else.`;
+RULE 1 - TRANSLATE EXACTLY: Only translate what the speaker actually said. Do NOT add, infer, or expand on anything.
+RULE 2 - COLLOQUIAL: Use natural everyday spoken dialect. NOT formal or bookish language.
+RULE 3 - OUTPUT: Print ONLY the translated text. Nothing else.
+RULE 4 - STYLE: ${langStyleRule}`;
 
     // Build messages array with few-shot examples for Tamil to lock in spoken style
     const messages = [{ role: 'system', content: systemPrompt }];

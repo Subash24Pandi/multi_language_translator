@@ -19,7 +19,8 @@ export default function Session() {
   const { sessionId, role, language, partnerJoined, partnerLanguage, partnerRole, setSessionData, resetSession } = useStore();
   
   const [status, setStatus] = useState('Waiting for partner...');
-  const [transcripts, setTranscripts] = useState([]); // { text, isSelf, originalText }
+  const [transcripts, setTranscripts] = useState([]);
+  const isPlayingAudioRef = useRef(false); // Guard against echo loop
   
   useEffect(() => {
     if (!sessionId) {
@@ -56,13 +57,20 @@ export default function Session() {
       try {
         const audioSrc = `data:audio/wav;base64,${data.audioBase64}`;
         const audio = new Audio(audioSrc);
-        audio.playbackRate = 1.0; // Normal speed
+        audio.playbackRate = 1.0;
+        isPlayingAudioRef.current = true; // Block mic input during playback
         audio.onended = () => {
+          isPlayingAudioRef.current = false; // Re-enable after playback
+          setStatus('Ready');
+        };
+        audio.onerror = () => {
+          isPlayingAudioRef.current = false;
           setStatus('Ready');
         };
         audio.play();
       } catch (err) {
         console.error('Error playing audio:', err);
+        isPlayingAudioRef.current = false;
         setStatus('Ready');
       }
     });
@@ -93,6 +101,11 @@ export default function Session() {
   }, [id, sessionId, role, language, navigate, setSessionData]);
 
   const handleAudioComplete = async (blob) => {
+    // Block audio processing while TTS is playing (prevents echo loop)
+    if (isPlayingAudioRef.current) {
+      console.log('Skipping audio: TTS is playing');
+      return;
+    }
     setStatus('Processing...');
     
     try {
