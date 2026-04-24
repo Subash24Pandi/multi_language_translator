@@ -190,15 +190,128 @@ Use simple, polite sentences like a kind Indian doctor/nurse would speak. No Ame
 
     const systemPrompt = `You are a medical interpreter. Translate the message from ${sourceName} to ${targetName}.
 
-RULE 1 — ACCURACY (MOST IMPORTANT): Translate EXACTLY what was said. Every word must have the same meaning in the output. Do NOT add, remove, guess, or change any part of the message.
+RULE 1 — ACCURACY: Translate EXACTLY what was said. Do NOT add, remove, or change meaning.
 RULE 2 — STYLE: ${langStyleRule}
-RULE 3 — OUTPUT: Print ONLY the translated sentence. Nothing else.`;
+RULE 3 — OUTPUT: Print ONLY the translated text. Nothing else.`;
+
+    // Build messages array with few-shot examples for Tamil to lock in spoken style
+    const messages = [{ role: 'system', content: systemPrompt }];
+    
+    if (targetLang === 'ta') {
+      // Few-shot examples: show the model EXACTLY what spoken Tamil looks like
+      messages.push({ role: 'user', content: 'Hello, how are you sir?' });
+      messages.push({ role: 'assistant', content: 'ஹலோ, எப்படி இருக்கீங்க சார்?' });
+      messages.push({ role: 'user', content: 'What are you doing?' });
+      messages.push({ role: 'assistant', content: 'என்ன பண்றீங்க?' });
+      messages.push({ role: 'user', content: 'Did you eat?' });
+      messages.push({ role: 'assistant', content: 'சாப்பிட்டீங்களா?' });
+      messages.push({ role: 'user', content: 'I have a headache and chest pain.' });
+      messages.push({ role: 'assistant', content: 'தலை வலிக்குது, நெஞ்சுல வலிக்குது.' });
+      messages.push({ role: 'user', content: 'What did the doctor say?' });
+      messages.push({ role: 'assistant', content: 'Doctor என்ன சொன்னாங்க?' });
+      messages.push({ role: 'user', content: 'Please take rest and drink water.' });
+      messages.push({ role: 'assistant', content: 'ரெஸ்ட் எடுங்க, தண்ணி குடிங்க.' });
+    } else if (targetLang === 'hi') {
+      messages.push({ role: 'user', content: 'Hello, how are you sir?' });
+      messages.push({ role: 'assistant', content: 'हेलो, कैसे हो सर?' });
+      messages.push({ role: 'user', content: 'What are you doing?' });
+      messages.push({ role: 'assistant', content: 'क्या कर रहे हो?' });
+      messages.push({ role: 'user', content: 'Did you eat?' });
+      messages.push({ role: 'assistant', content: 'खाना खाया?' });
+      messages.push({ role: 'user', content: 'I have a headache.' });
+      messages.push({ role: 'assistant', content: 'सिर में दर्द हो रहा है।' });
+    } else if (targetLang === 'te') {
+      messages.push({ role: 'user', content: 'Hello, how are you sir?' });
+      messages.push({ role: 'assistant', content: 'హలో, ఎలా ఉన్నారు సార్?' });
+      messages.push({ role: 'user', content: 'What are you doing?' });
+      messages.push({ role: 'assistant', content: 'ఏం చేస్తున్నారు?' });
+      messages.push({ role: 'user', content: 'Did you eat?' });
+      messages.push({ role: 'assistant', content: 'తిన్నారా?' });
+      messages.push({ role: 'user', content: 'I have a headache and chest pain.' });
+      messages.push({ role: 'assistant', content: 'తలనొప్పిగా ఉంది, గుండె నొప్పిగా ఉంది.' });
+      messages.push({ role: 'user', content: 'What did the doctor say?' });
+      messages.push({ role: 'assistant', content: 'Doctor ఏం చెప్పారు?' });
+    } else if (targetLang === 'kn') {
+      messages.push({ role: 'user', content: 'Hello, how are you sir?' });
+      messages.push({ role: 'assistant', content: 'ಹಲೋ, ಹೇಗಿದ್ದೀರಾ ಸಾರ್?' });
+      messages.push({ role: 'user', content: 'What are you doing?' });
+      messages.push({ role: 'assistant', content: 'ಏನ್ ಮಾಡ್ತಿದ್ದೀರಾ?' });
+      messages.push({ role: 'user', content: 'Did you eat?' });
+      messages.push({ role: 'assistant', content: 'ಊಟ ಆಯ್ತಾ?' });
+      messages.push({ role: 'user', content: 'I have a headache.' });
+      messages.push({ role: 'assistant', content: 'ತಲೆ ನೋವಾಗ್ತಿದೆ.' });
+      messages.push({ role: 'user', content: 'What did the doctor say?' });
+      messages.push({ role: 'assistant', content: 'Doctor ಏನ್ ಹೇಳಿದ್ರು?' });
+    } else if (targetLang === 'ml') {
+      messages.push({ role: 'user', content: 'Hello, how are you sir?' });
+      messages.push({ role: 'assistant', content: 'ഹലോ, എന്താ സുഖം സർ?' });
+      messages.push({ role: 'user', content: 'What are you doing?' });
+      messages.push({ role: 'assistant', content: 'എന്ത് ചെയ്യുന്നു?' });
+      messages.push({ role: 'user', content: 'Did you eat?' });
+      messages.push({ role: 'assistant', content: 'ഭക്ഷണം കഴിച്ചോ?' });
+      messages.push({ role: 'user', content: 'I have a headache.' });
+      messages.push({ role: 'assistant', content: 'തലവേദനയുണ്ട്.' });
+      messages.push({ role: 'user', content: 'What did the doctor say?' });
+      messages.push({ role: 'assistant', content: 'Doctor എന്ത് പറഞ്ഞു?' });
+    } else if (targetLang === 'bn') {
+      messages.push({ role: 'user', content: 'Hello, how are you sir?' });
+      messages.push({ role: 'assistant', content: 'হ্যালো, কেমন আছেন স্যার?' });
+      messages.push({ role: 'user', content: 'What are you doing?' });
+      messages.push({ role: 'assistant', content: 'কী করছেন?' });
+      messages.push({ role: 'user', content: 'Did you eat?' });
+      messages.push({ role: 'assistant', content: 'খেয়েছেন?' });
+      messages.push({ role: 'user', content: 'I have a headache.' });
+      messages.push({ role: 'assistant', content: 'মাথা ব্যথা করছে।' });
+      messages.push({ role: 'user', content: 'What did the doctor say?' });
+      messages.push({ role: 'assistant', content: 'Doctor কী বললেন?' });
+    } else if (targetLang === 'mr') {
+      messages.push({ role: 'user', content: 'Hello, how are you sir?' });
+      messages.push({ role: 'assistant', content: 'हेलो, कसे आहात सर?' });
+      messages.push({ role: 'user', content: 'What are you doing?' });
+      messages.push({ role: 'assistant', content: 'काय करतोय?' });
+      messages.push({ role: 'user', content: 'Did you eat?' });
+      messages.push({ role: 'assistant', content: 'जेवलात का?' });
+      messages.push({ role: 'user', content: 'I have a headache.' });
+      messages.push({ role: 'assistant', content: 'डोकं दुखतंय.' });
+      messages.push({ role: 'user', content: 'What did the doctor say?' });
+      messages.push({ role: 'assistant', content: 'Doctor नी काय सांगितलं?' });
+    } else if (targetLang === 'gu') {
+      messages.push({ role: 'user', content: 'Hello, how are you sir?' });
+      messages.push({ role: 'assistant', content: 'હેલો, કેમ છો સર?' });
+      messages.push({ role: 'user', content: 'What are you doing?' });
+      messages.push({ role: 'assistant', content: 'શું કરો છો?' });
+      messages.push({ role: 'user', content: 'Did you eat?' });
+      messages.push({ role: 'assistant', content: 'જમ્યા?' });
+      messages.push({ role: 'user', content: 'I have a headache.' });
+      messages.push({ role: 'assistant', content: 'માથું દુખે છે.' });
+      messages.push({ role: 'user', content: 'What did the doctor say?' });
+      messages.push({ role: 'assistant', content: 'Doctor એ શું કીધું?' });
+    } else if (targetLang === 'or') {
+      messages.push({ role: 'user', content: 'Hello, how are you sir?' });
+      messages.push({ role: 'assistant', content: 'ହେଲୋ, କେମିତି ଅଛନ୍ତି ସାର୍?' });
+      messages.push({ role: 'user', content: 'What are you doing?' });
+      messages.push({ role: 'assistant', content: 'କ\'ଣ କରୁଛ?' });
+      messages.push({ role: 'user', content: 'Did you eat?' });
+      messages.push({ role: 'assistant', content: 'ଖାଇଛ?' });
+      messages.push({ role: 'user', content: 'I have a headache.' });
+      messages.push({ role: 'assistant', content: 'ମୁଣ୍ଡ ଯନ୍ତ୍ରଣା ହେଉଛି।' });
+    } else if (targetLang === 'en') {
+      messages.push({ role: 'user', content: 'ஹலோ, எப்படி இருக்கீங்க சார்?' });
+      messages.push({ role: 'assistant', content: 'Hello, how are you sir?' });
+      messages.push({ role: 'user', content: 'என்ன பண்றீங்க?' });
+      messages.push({ role: 'assistant', content: 'What are you doing?' });
+      messages.push({ role: 'user', content: 'தலை வலிக்குது, சாப்பிடல.' });
+      messages.push({ role: 'assistant', content: 'I have a headache and I have not eaten.' });
+      messages.push({ role: 'user', content: 'Doctor என்ன சொன்னாங்க?' });
+      messages.push({ role: 'assistant', content: 'What did the doctor say?' });
+      messages.push({ role: 'user', content: 'ரெஸ்ட் எடுக்கணும்னு சொன்னாங்க.' });
+      messages.push({ role: 'assistant', content: 'They said you need to rest.' });
+    }
+    
+    messages.push({ role: 'user', content: text });
 
     const response = await groq.chat.completions.create({
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: text }
-      ],
+      messages,
       model: 'llama-3.3-70b-versatile',
       temperature: 0.2,
       max_tokens: 1024,
