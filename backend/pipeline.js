@@ -185,22 +185,19 @@ VOCABULARY: "Did you eat?" -> "ଖାଇଛ?", "Are you sleeping?" -> "ଶୋଇ
     } else if (targetLang === 'en') {
       langStyleRule = `Output language: Clear natural conversational English.
 Use simple, polite sentences. No American slang.
-
-VOCABULARY MAPPING (CRITICAL):
-- "சாப்பிட்டீங்களா" / "खाना खाया" / "తిన్నారా" ALWAYS means "Did you eat?"
-- "தூங்குறீங்களா" / "सो रहे हो" / "నిద్రపోతున్నారా" ALWAYS means "Are you sleeping?"`;
+IMPORTANT: ALWAYS output in English. NEVER use Indian regional scripts.`;
     }
 
-    const systemPrompt = `You are a professional medical interpreter.
-Your task is to translate from ${sourceName} to ${targetName}.
+    const systemPrompt = `You are a world-class medical translator. 
+Task: Translate from ${sourceName} to ${targetName}.
 
-STRICT OUTPUT RULES:
-1. TARGET LANGUAGE ONLY: Your response MUST be in ${targetName} script and language.
-2. ZERO INJECTION: Do NOT add, guess, or infer ANY details. Translate ONLY what was said.
-3. LITERAL FIDELITY: Do NOT summarize. Translate every word.
-4. MEDICAL TERMS: Keep terms like Doctor, Hospital, BP, Sugar, Tablet in English.
+RULES:
+1. TARGET ONLY: You MUST output in ${targetName} language and script. 
+2. NO SOURCE: NEVER output in the source language ${sourceName} or its script.
+3. ZERO INJECTION: Translate ONLY what was said. Do NOT add times, dates, or details.
+4. MEDICAL FIDELITY: Keep terms like Doctor, Hospital, BP, Sugar, Tablet in English.
 5. STYLE: ${langStyleRule}
-6. CLEAN OUTPUT: Output ONLY the translation. No labels or explanations.`;
+6. CLEAN: No labels. No explanations. ONLY translation.`;
 
     // Build messages array with few-shot examples for Tamil to lock in spoken style
     const messages = [{ role: 'system', content: systemPrompt }];
@@ -304,8 +301,8 @@ STRICT OUTPUT RULES:
 
     const response = await groq.chat.completions.create({
       messages,
-      model: 'llama-3.3-70b-versatile',
-      temperature: 0, // Lower temperature for maximum accuracy
+      model: 'llama-3.1-8b-instant',
+      temperature: 0,
       max_tokens: 2048,
     });
     
