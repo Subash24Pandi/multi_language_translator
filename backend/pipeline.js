@@ -158,11 +158,10 @@ async function translateText(text, sourceLang, targetLang) {
     
     let langStyleRule = '';
     if (targetLang === 'ta') {
-      langStyleRule = `Output language: Spoken Colloquial Tamil (தமிழ்). Use Tamil script ONLY.
-Use natural everyday spoken suffixes like -ஈங்க, -ஈங்களா.
-- "Can you hear me?" ALWAYS translates to "நான் பேசுறது கேக்குதா?" or "கேக்குதா?"
-- NEVER use formal "கேட்கிறீர்களா" or "கேட்கலாமா".
-VOCABULARY: "Did you eat?" -> "சாப்பிட்டீங்களா?", "Are you sleeping?" -> "தூங்குறீங்களா?"`;
+      langStyleRule = `Output language: MODERN Colloquial Tamil. Use Tamil script.
+STYLE: How people speak in 2024. Use spoken suffixes like -ஈங்க, -ஆச்சு.
+VOCAB: "Did you eat?" -> "சாப்ட்டீங்களா?", "Can you hear?" -> "கேக்குதா?", "What are you doing?" -> "என்ன பண்றீங்க?"
+NEVER use bookish Tamil (-ீர்கள், -கிறீர்கள்).`;
     } else if (targetLang === 'te') {
       langStyleRule = `Output language: Spoken Colloquial Telugu. Use Telugu script ONLY.
 VOCABULARY: "Did you eat?" -> "తిన్నారా?", "Are you sleeping?" -> "నిద్రపోతున్నారా?"`;
@@ -196,20 +195,20 @@ VOCABULARY MAPPING (CRITICAL):
 - "தூங்குறீங்களா" / "सो रहे हो" / "నిద్రపోతున్నారా" ALWAYS means "Are you sleeping?"`;
     }
 
-    const systemPrompt = `You are a professional medical interpreter. Translate between ${sourceName} and ${targetName}.
+    const systemPrompt = `You are a real-time spoken interpreter. Translate EXACTLY what was said from ${sourceName} to ${targetName}.
 
-CRITICAL INSTRUCTIONS:
-1. LITERAL ACCURACY: Translate the exact words spoken. If the user says "Did you eat?", do NOT translate it as "Are you sleeping?".
-2. NO SUMMARY: Do NOT summarize. If there are 3 sentences, translate all 3 separately.
-3. NO INJECTION: Do NOT add information. If they say "Hi", only say "Hi".
+CRITICAL RULES:
+1. EXTREME COLLOQUIALISM: Use natural, modern, everyday spoken language. Speak like friends or family. NO formal/bookish words.
+2. NO HALLUCINATION: Translate only what was said. Do NOT summarize.
+3. MEDICAL CONTEXT: Keep terms like Doctor, Hospital, BP, Sugar, Tablet in English.
 4. STYLE: ${langStyleRule}
-5. OUTPUT: Print ONLY the translated text.`;
+5. OUTPUT: ONLY translated text.`;
 
     // Build messages array with few-shot examples for Tamil to lock in spoken style
     const messages = [{ role: 'system', content: systemPrompt }];
     
     if (targetLang === 'ta') {
-      // Few-shot examples: show the model EXACTLY what spoken Tamil looks like
+      // Modern 2024 Spoken Tamil examples
       messages.push({ role: 'user', content: 'Hello, how are you sir?' });
       messages.push({ role: 'assistant', content: 'ஹலோ, எப்படி இருக்கீங்க சார்?' });
       messages.push({ role: 'user', content: 'Hi, can you hear me?' });
@@ -217,13 +216,15 @@ CRITICAL INSTRUCTIONS:
       messages.push({ role: 'user', content: 'What are you doing?' });
       messages.push({ role: 'assistant', content: 'என்ன பண்றீங்க?' });
       messages.push({ role: 'user', content: 'Did you eat?' });
-      messages.push({ role: 'assistant', content: 'சாப்பிட்டீங்களா?' });
+      messages.push({ role: 'assistant', content: 'சாப்ட்டீங்களா?' });
       messages.push({ role: 'user', content: 'I have a headache and chest pain.' });
       messages.push({ role: 'assistant', content: 'தலை வலிக்குது, நெஞ்சுல வலிக்குது.' });
       messages.push({ role: 'user', content: 'What did the doctor say?' });
       messages.push({ role: 'assistant', content: 'Doctor என்ன சொன்னாங்க?' });
       messages.push({ role: 'user', content: 'Please take rest and drink water.' });
       messages.push({ role: 'assistant', content: 'ரெஸ்ட் எடுங்க, தண்ணி குடிங்க.' });
+      messages.push({ role: 'user', content: 'I finished my lunch, let\'s go.' });
+      messages.push({ role: 'assistant', content: 'லஞ்ச் சாப்ட்டு முடிச்சுட்டேன், போலாம் வாங்க.' });
     } else if (targetLang === 'hi') {
       messages.push({ role: 'user', content: 'Hello, how are you sir?' });
       messages.push({ role: 'assistant', content: 'हेलो, कैसे हो सर?' });
@@ -305,7 +306,7 @@ CRITICAL INSTRUCTIONS:
 
     const response = await groq.chat.completions.create({
       messages,
-      model: 'llama-3.3-70b-versatile',
+      model: 'llama-3.1-8b-instant',
       temperature: 0.1,
       max_tokens: 2048,
     });
