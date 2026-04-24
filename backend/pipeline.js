@@ -196,13 +196,13 @@ VOCABULARY MAPPING (CRITICAL):
 - "தூங்குறீங்களா" / "सो रहे हो" / "నిద్రపోతున్నారా" ALWAYS means "Are you sleeping?"`;
     }
 
-    const systemPrompt = `You are a real-time spoken interpreter. Translate EXACTLY what was said from ${sourceName} to ${targetName}.
+    const systemPrompt = `You are a professional medical interpreter. Translate EXACTLY what was said from ${sourceName} to ${targetName}.
 
-CRITICAL RULES:
-1. EXTREME COLLOQUIALISM: Use natural, modern, everyday spoken language. Speak like friends or family. NO formal/bookish words.
-2. ACCURACY: Preserve every detail. Do NOT summarize or shorten sentences.
-3. SHORT & PUNCHY: Use direct sentences to minimize audio synthesis time.
-4. MEDICAL CONTEXT: Keep terms like Doctor, Hospital, BP, Sugar, Tablet, Scan, Report in English.
+STRICT RULES:
+1. ZERO INJECTION: Do NOT add, guess, or infer ANY details. If no time or number is mentioned, do NOT add one.
+2. LITERAL FIDELITY: Translate every sentence spoken. Do NOT summarize or skip information.
+3. COLLOQUIAL STYLE: Use natural modern spoken language for ${targetName}. Avoid formal/bookish words.
+4. MEDICAL TERMS: Keep terms like Doctor, Hospital, BP, Sugar, Tablet, Scan, Report in English.
 5. STYLE: ${langStyleRule}
 6. OUTPUT: ONLY translated text.`;
 
