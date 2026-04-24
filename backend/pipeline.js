@@ -106,43 +106,21 @@ async function transcribeAudio(audioBuffer, lang) {
       base64Data = audioBuffer.split(';base64,').pop();
     }
     const binaryBuffer = Buffer.from(base64Data, 'base64');
-    
-    // 2. Convert WebM to WAV (Sarvam requires WAV format)
-    const tempId = `audio_${Date.now()}_${Math.floor(Math.random()*1000)}`;
-    webmPath = path.join(os.tmpdir(), `${tempId}.webm`);
-    wavPath = path.join(os.tmpdir(), `${tempId}.wav`);
-    
-    fs.writeFileSync(webmPath, binaryBuffer);
-    
-    // WAV at 16kHz mono - exactly what Sarvam saaras:v3 requires
-    // Use ultrafast preset for minimum latency
-    execSync(`ffmpeg -y -i "${webmPath}" -preset ultrafast -ar 16000 -ac 1 -sample_fmt s16 "${wavPath}"`, { stdio: 'ignore' });
-    
-    const wavBuffer = fs.readFileSync(wavPath);
-    
-    // 3. Upload to Sarvam
-    const formData = new FormData();
-    formData.append('file', wavBuffer, { filename: 'audio.wav', contentType: 'audio/wav' });
-    formData.append('model', 'saaras:v3');
-    if (SARVAM_LANG_MAP[lang]) {
-      formData.append('language_code', SARVAM_LANG_MAP[lang]);
-    }
 
-    const response = await axios.post('https://api.sarvam.ai/speech-to-text', formData, {
-      headers: {
-        ...formData.getHeaders(),
-        'api-subscription-key': process.env.SARVAM_API_KEY
+    const deepgramLang = DEEPGRAM_LANG_MAP[lang] || 'en-US';
+    const response = await axios.post(
+      `https://api.deepgram.com/v1/listen?model=nova-2&language=${deepgramLang}&smart_format=true`,
+      binaryBuffer,
+      {
+        headers: {
+          'Authorization': `Token ${process.env.DEEPGRAM_API_KEY}`,
+          'Content-Type': 'audio/webm'
+        }
       }
-    });
-
-    if (fs.existsSync(webmPath)) fs.unlinkSync(webmPath);
-    if (fs.existsSync(wavPath)) fs.unlinkSync(wavPath);
-
-    return response.data.transcript || '';
+    );
+    return response.data.results?.channels[0]?.alternatives[0]?.transcript || '';
   } catch (error) {
-    if (webmPath && fs.existsSync(webmPath)) fs.unlinkSync(webmPath);
-    if (wavPath && fs.existsSync(wavPath)) fs.unlinkSync(wavPath);
-    console.error('Sarvam STT Error:', error.response?.data || error.message);
+    console.error('Deepgram Error:', error.message);
     throw new Error('STT Failed');
   }
 }
@@ -188,16 +166,12 @@ Use simple, polite sentences. No American slang.
 IMPORTANT: ALWAYS output in English. NEVER use Indian regional scripts.`;
     }
 
-    const systemPrompt = `You are a professional medical interpreter. Translate from ${sourceName} to ${targetName}.
-STRICT RULES:
-1. HYPER-LITERAL: Translate EXACTLY what was said. Do NOT change meaning.
-2. PRONOUNS & SUBJECTS: 
-   - Use "You" ONLY if an explicit second-person pronoun (like "You", "Aap", "Nee", "Meeru") is used.
-   - In medical contexts, if the subject is omitted or ambiguous (e.g., "Said to operate?"), ALWAYS translate as "Did they (the doctors) say?" rather than assuming "You".
-3. NO SUMMARIZATION: Preserve every nuance, question, and punctuation.
-4. SCRIPT: Output ONLY in ${targetName} script and language.
-5. MEDICAL: Keep BP, Sugar, Tablet, Doctor, Hospital, Scan, ECG, Operation, Report in English.
-6. STYLE: Colloquial but 100% faithful to the original words.`;
+    const systemPrompt = `You are a medical interpreter. Translate from ${sourceName} to ${targetName}.
+RULES:
+1. Translate EXACTLY. No summary. No additions.
+2. In medical questions, translate "Did they say?" correctly (don't say "Did YOU say?").
+3. Keep BP, ECG, Scan, Operation, Report, Tablet in English.
+4. Output ONLY the ${targetName} translation.`;
 
     // Build messages array with few-shot examples for Tamil to lock in spoken style
     const messages = [{ role: 'system', content: systemPrompt }];
@@ -297,9 +271,9 @@ STRICT RULES:
 
     const response = await groq.chat.completions.create({
       messages,
-      model: 'llama-3.1-8b-instant',
+      model: 'llama-3.3-70b-versatile',
       temperature: 0,
-      max_tokens: 2048,
+      max_tokens: 1024,
     });
     
     return response.choices[0]?.message?.content?.trim() || '';
