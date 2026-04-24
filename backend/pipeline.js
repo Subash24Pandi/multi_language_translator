@@ -96,27 +96,23 @@ export async function processAudioBuffer(audioBuffer, sourceLang, targetLang) {
 }
 
 async function transcribeAudio(audioBuffer, lang) {
-  let webmPath = '';
-  let wavPath = '';
-  
   try {
-    // 1. Decode base64 to binary
-    const deepgramLang = DEEPGRAM_LANG_MAP[lang] || 'en-US';
-    const response = await axios.post(
-      `https://api.deepgram.com/v1/listen?model=general&language=${deepgramLang}&smart_format=true&filler_words=true`,
-      binaryBuffer,
-      {
-        headers: {
-          'Authorization': `Token ${process.env.DEEPGRAM_API_KEY}`,
-          'Content-Type': 'application/octet-stream'
-        }
-      }
-    );
-    return response.data.results?.channels[0]?.alternatives[0]?.transcript || '';
+    const binaryBuffer = Buffer.isBuffer(audioBuffer) ? audioBuffer : Buffer.from(audioBuffer);
+    
+    // Save to a temporary file because Groq SDK expects a file-like object or path
+    const tempPath = path.join(os.tmpdir(), `audio_${Date.now()}.webm`);
+    fs.writeFileSync(tempPath, binaryBuffer);
+
+    const transcription = await groq.audio.transcriptions.create({
+      file: fs.createReadStream(tempPath),
+      model: 'whisper-large-v3',
+      language: lang, // whisper uses ISO codes (ta, hi, en)
+    });
+
+    fs.unlinkSync(tempPath);
+    return transcription.text || '';
   } catch (error) {
-    if (error.response) {
-      console.error('Deepgram Error Details:', JSON.stringify(error.response.data));
-    }
+    console.error('Groq STT Error:', error.message);
     throw new Error('STT Failed');
   }
 }
