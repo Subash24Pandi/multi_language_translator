@@ -38,12 +38,8 @@ export function useAudioRecorder(onAudioComplete) {
       analyser.fftSize = 512;
       
       const source = audioContext.createMediaStreamSource(stream);
-      // Software boost: Amplify the signal for better silence detection
-      const gainNode = audioContext.createGain();
-      gainNode.gain.value = 2.0; 
-      
-      source.connect(gainNode);
-      gainNode.connect(analyser);
+      // Direct connection - no gain boost to prevent audio distortion
+      source.connect(analyser);
       
       const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
       mediaRecorderRef.current = mediaRecorder;
