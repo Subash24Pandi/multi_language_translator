@@ -106,8 +106,8 @@ async function transcribeAudio(audioBuffer, lang) {
     
     fs.writeFileSync(webmPath, binaryBuffer);
     
-    // Use ffmpeg to convert to 32kbps MP3 (great for STT, tiny for upload)
-    execSync(`ffmpeg -y -i ${webmPath} -ar 16000 -ac 1 -b:a 32k ${mp3Path}`, { stdio: 'ignore' });
+    // Use ffmpeg to convert to high-quality MP3 (128k is clear for STT)
+    execSync(`ffmpeg -y -i ${webmPath} -ar 16000 -ac 1 -b:a 128k ${mp3Path}`, { stdio: 'ignore' });
     
     const mp3Buffer = fs.readFileSync(mp3Path);
     
@@ -141,7 +141,6 @@ async function transcribeAudio(audioBuffer, lang) {
     return data.transcript || '';
   } catch (error) {
     if (fs.existsSync(webmPath)) fs.unlinkSync(webmPath);
-    // Fixed: mp3Path might not be defined if error happened before its creation
     const tempMp3Path = webmPath ? webmPath.replace('.webm', '.mp3') : '';
     if (tempMp3Path && fs.existsSync(tempMp3Path)) fs.unlinkSync(tempMp3Path);
     console.error('Sarvam STT Error:', error.message);
@@ -157,21 +156,18 @@ async function translateText(text, sourceLang, targetLang) {
     let targetSpecificRules = '';
     if (targetLang === 'ta') {
       targetSpecificRules = `
-- STRICTLY FORBIDDEN: Do not use "Thuya" (pure/formal/bookish) Tamil. 
-- HOW TO BE POLITE: Use spoken respectful suffixes. For Tamil, use the spoken '-eenga' suffix (e.g., "பண்றீங்க", "சாப்பிட்டீங்களா", "சொல்லுங்க"). NEVER use the formal written '-eerkal' suffix (e.g., do NOT use "செய்கிறீர்கள்", "சாப்பிட்டீர்களா", "கூறுங்கள்").`;
-    } else if (targetLang === 'hi') {
-      targetSpecificRules = `
-- STRICTLY FORBIDDEN: Do not use formal/pure Hindi (Shuddh Hindi). Use casual everyday spoken Hindi.`;
+- CRITICAL: Use "Spoken Tamil" (Colloquial). 
+- FORBIDDEN: Do not use bookish/formal/pure Tamil (No 'Thuya Tamil').
+- STYLE: Use natural spoken grammar and phonetic spellings (e.g., use "Vanga", "Sapteengala", "Erukkeenga"). 
+- POLITE: Use spoken respectful suffixes like '-eenga' ALWAYS.`;
     }
 
-    const systemPrompt = `You are a medical translator strictly translating from ${sourceName} to ${targetName}.
+    const systemPrompt = `You are a helpful translator. Translate the user's message from ${sourceName} to ${targetName}.
 RULES:
-- You MUST translate the EXACT meaning accurately, but using natural conversational grammar. DO NOT change the original message's intent or hallucinate different greetings.
-- CRITICAL: You MUST use colloquial, spoken regional language. ${targetSpecificRules}
-- DO NOT use English slang like 'dude' or 'what's up doc'. Just use normal respectful spoken street language.
-- CRITICAL SCRIPT RULE: You MUST write the translation ONLY in the native alphabet/script of ${targetName}. NEVER output the source language.
-- PACING RULE: Break long sentences into shorter chunks and use commas (,) generously.
-- DO NOT add extra words, summarize, or explain. Output ONLY the translated text.`;
+- CRITICAL: Translate naturally like people speak on the street in ${targetName}. 
+- STRLICTLY FORBIDDEN: Do not use bookish, formal, or dictionary-style language.
+- ${targetSpecificRules}
+- ONLY output the translated text. Do not explain anything.`;
 
     const response = await groq.chat.completions.create({
       messages: [
