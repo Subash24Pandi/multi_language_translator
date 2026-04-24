@@ -101,26 +101,24 @@ async function transcribeAudio(audioBuffer, lang) {
   
   try {
     // 1. Decode base64 to binary
-    let base64Data = audioBuffer;
-    if (typeof audioBuffer === 'string' && audioBuffer.includes(';base64,')) {
-      base64Data = audioBuffer.split(';base64,').pop();
-    }
-    const binaryBuffer = Buffer.from(base64Data, 'base64');
+    const binaryBuffer = Buffer.isBuffer(audioBuffer) ? audioBuffer : Buffer.from(audioBuffer);
 
     const deepgramLang = DEEPGRAM_LANG_MAP[lang] || 'en-US';
     const response = await axios.post(
-      `https://api.deepgram.com/v1/listen?model=nova-2&language=${deepgramLang}&smart_format=true`,
+      `https://api.deepgram.com/v1/listen?language=${deepgramLang}&smart_format=true&filler_words=true`,
       binaryBuffer,
       {
         headers: {
           'Authorization': `Token ${process.env.DEEPGRAM_API_KEY}`,
-          'Content-Type': 'audio/webm'
+          'Content-Type': 'application/octet-stream'
         }
       }
     );
     return response.data.results?.channels[0]?.alternatives[0]?.transcript || '';
   } catch (error) {
-    console.error('Deepgram Error:', error.message);
+    if (error.response) {
+      console.error('Deepgram Error Details:', JSON.stringify(error.response.data));
+    }
     throw new Error('STT Failed');
   }
 }
