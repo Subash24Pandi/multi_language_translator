@@ -205,7 +205,8 @@ async function synthesizeSpeech(text, lang) {
           encoding: 'pcm_f32le',
           sample_rate: 44100
         },
-        language: lang
+        // Fallback: Cartesia doesn't support 'or' code yet, use 'en' or 'hi' for the engine
+        language: lang === 'or' ? 'hi' : lang
       },
       {
         headers: {
