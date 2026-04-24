@@ -20,7 +20,7 @@ const VOICE_MAP = {
   gu: '4590a461-bc68-4a50-8d14-ac04f5923d22',
   mr: '5c32dce6-936a-4892-b131-bafe474afe5f',
   ml: '374b80da-e622-4dfc-90f6-1eeb13d331c9',
-  or: '7c6219d2-e8d2-462c-89d8-7ecba7c75d65', // default as fallback
+  or: 'faf0731e-dfb9-4cfc-8119-259a79b27e12', // Fallback to Hindi voice for Odia script
 };
 
 const SARVAM_LANG_MAP = {
