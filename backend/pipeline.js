@@ -190,9 +190,10 @@ Use simple, polite sentences like a kind Indian doctor/nurse would speak. No Ame
 
     const systemPrompt = `You are a medical interpreter. Translate the message from ${sourceName} to ${targetName}.
 
-RULE 1 — ACCURACY: Translate EXACTLY what was said. Do NOT add, remove, or change meaning.
-RULE 2 — STYLE: ${langStyleRule}
-RULE 3 — OUTPUT: Print ONLY the translated text. Nothing else.`;
+RULE 1 — ACCURACY: Translate EVERY sentence EXACTLY as spoken. Do NOT summarize, shorten, or skip any part.
+RULE 2 — COMPLETENESS: If the input has 5 sentences, the output MUST also have 5 sentences worth of meaning.
+RULE 3 — STYLE: ${langStyleRule}
+RULE 4 — OUTPUT: Print ONLY the translated text. Nothing else.`;
 
     // Build messages array with few-shot examples for Tamil to lock in spoken style
     const messages = [{ role: 'system', content: systemPrompt }];
@@ -211,6 +212,9 @@ RULE 3 — OUTPUT: Print ONLY the translated text. Nothing else.`;
       messages.push({ role: 'assistant', content: 'Doctor என்ன சொன்னாங்க?' });
       messages.push({ role: 'user', content: 'Please take rest and drink water.' });
       messages.push({ role: 'assistant', content: 'ரெஸ்ட் எடுங்க, தண்ணி குடிங்க.' });
+      // Long multi-sentence example to prevent summarization
+      messages.push({ role: 'user', content: 'Sir, you told me yesterday that we could meet tomorrow morning. Can you tell me what time I should come? The doctor also told me that we need to meet. I will go see the doctor and buy my tablets. If you tell me the time, we can meet at your place.' });
+      messages.push({ role: 'assistant', content: 'சார், நேத்து நாளைக்கு காலையிலே மீட் பண்ணலாம்னு சொன்னீங்க. நான் எத்தனை மணிக்கு வரணும்னு சொல்லுங்க சார். Doctor-உம் நாம் மீட் பண்ணணும்னு சொன்னாங்க. நான் Doctor-கிட்ட போய் பாத்துட்டு மருந்து வாங்கிட்டு வருவேன். நீங்க டைம் சொன்னா, உங்க வீட்ல மீட் பண்ணலாம்.' });
     } else if (targetLang === 'hi') {
       messages.push({ role: 'user', content: 'Hello, how are you sir?' });
       messages.push({ role: 'assistant', content: 'हेलो, कैसे हो सर?' });
