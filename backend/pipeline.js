@@ -186,7 +186,13 @@ Use natural everyday spoken Gujarati. NEVER use formal Gujarati.`;
 Use natural everyday spoken Odia. NEVER use formal Odia.`;
     } else if (targetLang === 'en') {
       langStyleRule = `Output language: Clear natural conversational English.
-Use simple, polite sentences like a kind Indian doctor/nurse would speak. No American slang.`;
+Use simple, polite sentences. No American slang.
+
+VOCABULARY MAPPING (CRITICAL):
+- "சாப்பிட்டீங்களா" ALWAYS means "Did you eat?" (NEVER "Are you sleeping")
+- "தூங்குறீங்களா" means "Are you sleeping?"
+- "என்ன பண்றீங்க" means "What are you doing?"
+- "கேட்குதா" means "Can you hear me?"`;
     }
 
     const systemPrompt = `You are a professional medical interpreter. Translate between ${sourceName} and ${targetName}.
@@ -287,6 +293,8 @@ CRITICAL INSTRUCTIONS:
     } else if (targetLang === 'en') {
       messages.push({ role: 'user', content: 'ஹாய் சார், உங்களுக்கு கேட்குதா சார்? என்ன பண்றீங்க?' });
       messages.push({ role: 'assistant', content: 'Hi sir, can you hear me sir? What are you doing?' });
+      messages.push({ role: 'user', content: 'சாப்பிட்டீங்களா? தூங்குறீங்களா?' });
+      messages.push({ role: 'assistant', content: 'Did you eat? Are you sleeping?' });
       messages.push({ role: 'user', content: 'தலை வலிக்குது, சாப்பிடல, Doctor என்ன சொன்னாங்க?' });
       messages.push({ role: 'assistant', content: 'I have a headache, I have not eaten. What did the doctor say?' });
       messages.push({ role: 'user', content: 'ரெஸ்ட் எடுங்க, தண்ணி குடிங்க.' });
