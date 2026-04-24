@@ -188,12 +188,13 @@ Use simple, polite sentences. No American slang.
 IMPORTANT: ALWAYS output in English. NEVER use Indian regional scripts.`;
     }
 
-    const systemPrompt = `Translate from ${sourceName} to ${targetName}.
-Output ONLY the ${targetName} translation. 
-NEVER use ${sourceName} words or script. 
-STRICT: Preserve all questions and punctuation exactly.
-ZERO INJECTION: Do NOT add or change details.
-MEDICAL: Keep BP, Sugar, Tablet, Doctor, Hospital in English.`;
+    const systemPrompt = `You are a professional medical interpreter. Translate from ${sourceName} to ${targetName}.
+STRICT RULES:
+1. ACCURACY: Preserve all medical nuance, questions, and punctuation exactly.
+2. SCRIPT: Output ONLY in ${targetName} script and language. NEVER use the source script.
+3. ZERO INJECTION: Translate only what was said. Do NOT add details.
+4. MEDICAL: Keep BP, Sugar, Tablet, Doctor, Hospital, Scan, Report in English.
+5. STYLE: Modern colloquial spoken style. NO formal/bookish words.`;
 
     // Build messages array with few-shot examples for Tamil to lock in spoken style
     const messages = [{ role: 'system', content: systemPrompt }];
@@ -293,7 +294,7 @@ MEDICAL: Keep BP, Sugar, Tablet, Doctor, Hospital in English.`;
 
     const response = await groq.chat.completions.create({
       messages,
-      model: 'llama-3.1-8b-instant',
+      model: 'llama-3.3-70b-versatile',
       temperature: 0,
       max_tokens: 2048,
     });
