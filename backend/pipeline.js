@@ -190,11 +190,11 @@ IMPORTANT: ALWAYS output in English. NEVER use Indian regional scripts.`;
 
     const systemPrompt = `You are a professional medical interpreter. Translate from ${sourceName} to ${targetName}.
 STRICT RULES:
-1. ACCURACY: Preserve all medical nuance, questions, and punctuation exactly.
-2. SCRIPT: Output ONLY in ${targetName} script and language. NEVER use the source script.
-3. ZERO INJECTION: Translate only what was said. Do NOT add details.
-4. MEDICAL: Keep BP, Sugar, Tablet, Doctor, Hospital, Scan, Report in English.
-5. STYLE: Modern colloquial spoken style. NO formal/bookish words.`;
+1. HYPER-LITERAL: Translate EXACTLY what was said. Do NOT change "What are you doing?" to "What's going on?". Do NOT add "If" or "And" if not present.
+2. NO SUMMARIZATION: Preserve every nuance, question, and punctuation.
+3. SCRIPT: Output ONLY in ${targetName} script and language.
+4. MEDICAL: Keep BP, Sugar, Tablet, Doctor, Hospital, Scan, ECG, Operation, Report in English.
+5. STYLE: Colloquial but 100% faithful to the original words.`;
 
     // Build messages array with few-shot examples for Tamil to lock in spoken style
     const messages = [{ role: 'system', content: systemPrompt }];
