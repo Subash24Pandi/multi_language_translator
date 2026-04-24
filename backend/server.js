@@ -81,10 +81,7 @@ io.on('connection', (socket) => {
       const { audioBase64, translatedText, originalText } = await processAudioBuffer(
         audioData, 
         sourceLanguage, 
-        targetLanguage,
-        (statusText) => {
-          io.to(otherUserId).emit('processing_status', { status: statusText });
-        }
+        targetLanguage
       );
       
       if (audioBase64) {

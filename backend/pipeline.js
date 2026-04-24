@@ -62,10 +62,9 @@ const FULL_LANG_NAMES = {
   or: 'Odia'
 };
 
-export async function processAudioBuffer(audioBuffer, sourceLang, targetLang, statusCallback) {
+export async function processAudioBuffer(audioBuffer, sourceLang, targetLang) {
   try {
     // 1. STT: Sarvam Saaras v3
-    if (statusCallback) statusCallback('Transcribing...');
     let sttText = await transcribeAudio(audioBuffer, sourceLang);
     if (!sttText || sttText.trim() === '') {
       return { audioBase64: null, translatedText: '', originalText: '' };
@@ -76,20 +75,16 @@ export async function processAudioBuffer(audioBuffer, sourceLang, targetLang, st
     console.log(`[STT] Transcribed: ${sttText}`);
 
     // 2. LLM: Groq Translation (Only if languages are different)
-    if (statusCallback) statusCallback('Translating...');
     let translatedText = sttText;
     if (sourceLang !== targetLang) {
       translatedText = await translateText(sttText, sourceLang, targetLang);
       console.log(`[LLM] Translated: ${translatedText}`);
-    } else {
-      console.log(`[LLM] Skipped translation (source and target language are the same)`);
     }
 
-    // Strip labels again just in case the LLM added them
+    // Strip labels again
     translatedText = translatedText.replace(/^(Speaker\s*\d*\s*:|Doctor\s*:|Patient\s*:)\s*/i, '').trim();
 
     // 3. TTS: Cartesia
-    if (statusCallback) statusCallback('Generating voice...');
     const audioBase64 = await synthesizeSpeech(translatedText, targetLang);
     console.log(`[TTS] Audio generated for ${targetLang}`);
 
@@ -196,15 +191,16 @@ VOCABULARY MAPPING (CRITICAL):
 - "தூங்குறீங்களா" / "सो रहे हो" / "నిద్రపోతున్నారా" ALWAYS means "Are you sleeping?"`;
     }
 
-    const systemPrompt = `You are a professional medical interpreter. Translate EXACTLY what was said from ${sourceName} to ${targetName}.
+    const systemPrompt = `You are a professional medical interpreter.
+Your task is to translate from ${sourceName} to ${targetName}.
 
-STRICT RULES:
-1. ZERO INJECTION: Do NOT add, guess, or infer ANY details. If no time or number is mentioned, do NOT add one.
-2. LITERAL FIDELITY: Translate every sentence spoken. Do NOT summarize or skip information.
-3. COLLOQUIAL STYLE: Use natural modern spoken language for ${targetName}. Avoid formal/bookish words.
-4. MEDICAL TERMS: Keep terms like Doctor, Hospital, BP, Sugar, Tablet, Scan, Report in English.
+STRICT OUTPUT RULES:
+1. TARGET LANGUAGE ONLY: Your response MUST be in ${targetName} script and language.
+2. ZERO INJECTION: Do NOT add, guess, or infer ANY details. Translate ONLY what was said.
+3. LITERAL FIDELITY: Do NOT summarize. Translate every word.
+4. MEDICAL TERMS: Keep terms like Doctor, Hospital, BP, Sugar, Tablet in English.
 5. STYLE: ${langStyleRule}
-6. OUTPUT: ONLY translated text.`;
+6. CLEAN OUTPUT: Output ONLY the translation. No labels or explanations.`;
 
     // Build messages array with few-shot examples for Tamil to lock in spoken style
     const messages = [{ role: 'system', content: systemPrompt }];
@@ -308,8 +304,8 @@ STRICT RULES:
 
     const response = await groq.chat.completions.create({
       messages,
-      model: 'llama-3.1-8b-instant',
-      temperature: 0.1,
+      model: 'llama-3.3-70b-versatile',
+      temperature: 0, // Lower temperature for maximum accuracy
       max_tokens: 2048,
     });
     
