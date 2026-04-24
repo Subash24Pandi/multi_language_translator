@@ -99,27 +99,29 @@ async function transcribeAudio(audioBuffer, lang) {
     }
     const binaryBuffer = Buffer.from(base64Data, 'base64');
     
-    // 2. Perform ultra-fast server-side conversion from WebM to lightweight MP3 for Sarvam
+    // 2. Convert WebM to WAV (Sarvam requires WAV format - MP3 causes broken transcription)
     const tempId = `audio_${Date.now()}_${Math.floor(Math.random()*1000)}`;
     webmPath = path.join(os.tmpdir(), `${tempId}.webm`);
-    const mp3Path = path.join(os.tmpdir(), `${tempId}.mp3`);
+    const wavPath = path.join(os.tmpdir(), `${tempId}.wav`);
     
     fs.writeFileSync(webmPath, binaryBuffer);
     
-    // Use ffmpeg to convert to high-quality MP3 (128k is clear for STT)
-    execSync(`ffmpeg -y -i ${webmPath} -ar 16000 -ac 1 -b:a 128k ${mp3Path}`, { stdio: 'ignore' });
+    // WAV at 16kHz mono - exactly what Sarvam saaras:v3 requires
+    execSync(`ffmpeg -y -i ${webmPath} -ar 16000 -ac 1 -sample_fmt s16 ${wavPath}`, { stdio: 'ignore' });
     
-    const mp3Buffer = fs.readFileSync(mp3Path);
+    const wavBuffer = fs.readFileSync(wavPath);
     
     // 3. Upload to Sarvam
     const formData = new globalThis.FormData();
-    const audioBlob = new globalThis.Blob([mp3Buffer], { type: 'audio/mp3' });
-    formData.append('file', audioBlob, 'audio.mp3');
+    const audioBlob = new globalThis.Blob([wavBuffer], { type: 'audio/wav' });
+    formData.append('file', audioBlob, 'audio.wav');
     
     formData.append('model', 'saaras:v3');
     if (SARVAM_LANG_MAP[lang]) {
       formData.append('language_code', SARVAM_LANG_MAP[lang]);
     }
+    formData.append('with_timestamps', 'false');
+    formData.append('with_disfluencies', 'false');
 
     const response = await fetch('https://api.sarvam.ai/speech-to-text', {
       method: 'POST',
@@ -130,7 +132,7 @@ async function transcribeAudio(audioBuffer, lang) {
     });
 
     if (fs.existsSync(webmPath)) fs.unlinkSync(webmPath);
-    if (fs.existsSync(mp3Path)) fs.unlinkSync(mp3Path);
+    if (fs.existsSync(wavPath)) fs.unlinkSync(wavPath);
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -141,8 +143,8 @@ async function transcribeAudio(audioBuffer, lang) {
     return data.transcript || '';
   } catch (error) {
     if (fs.existsSync(webmPath)) fs.unlinkSync(webmPath);
-    const tempMp3Path = webmPath ? webmPath.replace('.webm', '.mp3') : '';
-    if (tempMp3Path && fs.existsSync(tempMp3Path)) fs.unlinkSync(tempMp3Path);
+    const tempWavPath = webmPath ? webmPath.replace('.webm', '.wav') : '';
+    if (tempWavPath && fs.existsSync(tempWavPath)) fs.unlinkSync(tempWavPath);
     console.error('Sarvam STT Error:', error.message);
     throw new Error('STT Failed');
   }
