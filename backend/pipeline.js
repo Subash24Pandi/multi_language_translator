@@ -120,7 +120,8 @@ async function transcribeAudio(audioBuffer, lang) {
     fs.writeFileSync(webmPath, binaryBuffer);
     
     // WAV at 16kHz mono - exactly what Sarvam saaras:v3 requires
-    execSync(`ffmpeg -y -i "${webmPath}" -ar 16000 -ac 1 -sample_fmt s16 "${wavPath}"`, { stdio: 'ignore' });
+    // Use ultrafast preset for minimum latency
+    execSync(`ffmpeg -y -i "${webmPath}" -preset ultrafast -ar 16000 -ac 1 -sample_fmt s16 "${wavPath}"`, { stdio: 'ignore' });
     
     const wavBuffer = fs.readFileSync(wavPath);
     
@@ -199,10 +200,11 @@ VOCABULARY MAPPING (CRITICAL):
 
 CRITICAL RULES:
 1. EXTREME COLLOQUIALISM: Use natural, modern, everyday spoken language. Speak like friends or family. NO formal/bookish words.
-2. NO HALLUCINATION: Translate only what was said. Do NOT summarize.
-3. MEDICAL CONTEXT: Keep terms like Doctor, Hospital, BP, Sugar, Tablet in English.
-4. STYLE: ${langStyleRule}
-5. OUTPUT: ONLY translated text.`;
+2. ACCURACY: Preserve every detail. Do NOT summarize or shorten sentences.
+3. SHORT & PUNCHY: Use direct sentences to minimize audio synthesis time.
+4. MEDICAL CONTEXT: Keep terms like Doctor, Hospital, BP, Sugar, Tablet, Scan, Report in English.
+5. STYLE: ${langStyleRule}
+6. OUTPUT: ONLY translated text.`;
 
     // Build messages array with few-shot examples for Tamil to lock in spoken style
     const messages = [{ role: 'system', content: systemPrompt }];

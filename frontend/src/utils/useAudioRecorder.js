@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback } from 'react';
 
-const SILENCE_THRESHOLD = 2;
-const SILENCE_DURATION_MS = 800;
+const SILENCE_THRESHOLD = 1.5;
+const SILENCE_DURATION_MS = 1000;
 
 export function useAudioRecorder(onAudioComplete) {
   const [isRecording, setIsRecording] = useState(false);
