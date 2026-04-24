@@ -191,8 +191,9 @@ IMPORTANT: ALWAYS output in English. NEVER use Indian regional scripts.`;
     const systemPrompt = `Translate from ${sourceName} to ${targetName}.
 Output ONLY the ${targetName} translation. 
 NEVER use ${sourceName} words or script. 
-NEVER add extra info.
-MEDICAL CONTEXT: Keep BP, Sugar, Tablet, Doctor, Hospital in English.`;
+STRICT: Preserve all questions and punctuation exactly.
+ZERO INJECTION: Do NOT add or change details.
+MEDICAL: Keep BP, Sugar, Tablet, Doctor, Hospital in English.`;
 
     // Build messages array with few-shot examples for Tamil to lock in spoken style
     const messages = [{ role: 'system', content: systemPrompt }];
