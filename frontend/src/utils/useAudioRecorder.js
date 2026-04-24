@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback } from 'react';
 
-const SILENCE_THRESHOLD = 5;
-const SILENCE_DURATION_MS = 2000;
+const SILENCE_THRESHOLD = 2;
+const SILENCE_DURATION_MS = 3000;
 
 export function useAudioRecorder(onAudioComplete) {
   const [isRecording, setIsRecording] = useState(false);
@@ -38,7 +38,12 @@ export function useAudioRecorder(onAudioComplete) {
       analyser.fftSize = 512;
       
       const source = audioContext.createMediaStreamSource(stream);
-      source.connect(analyser);
+      // Software boost: Amplify the signal for better silence detection
+      const gainNode = audioContext.createGain();
+      gainNode.gain.value = 2.0; 
+      
+      source.connect(gainNode);
+      gainNode.connect(analyser);
       
       const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
       mediaRecorderRef.current = mediaRecorder;
