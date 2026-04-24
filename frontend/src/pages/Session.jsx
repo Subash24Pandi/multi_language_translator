@@ -60,8 +60,11 @@ export default function Session() {
         audio.playbackRate = 1.0;
         isPlayingAudioRef.current = true; // Block mic input during playback
         audio.onended = () => {
-          isPlayingAudioRef.current = false; // Re-enable after playback
-          setStatus('Ready');
+          // Add a 500ms "cool-down" to ensure speakers are completely silent before re-enabling mic
+          setTimeout(() => {
+            isPlayingAudioRef.current = false;
+            setStatus('Ready');
+          }, 500);
         };
         audio.onerror = () => {
           isPlayingAudioRef.current = false;
