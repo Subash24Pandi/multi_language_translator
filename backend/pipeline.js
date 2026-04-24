@@ -304,12 +304,19 @@ RULE 4 — OUTPUT: Print ONLY the translated text. Nothing else.`;
       messages.push({ role: 'assistant', content: 'Hello, how are you sir?' });
       messages.push({ role: 'user', content: 'என்ன பண்றீங்க?' });
       messages.push({ role: 'assistant', content: 'What are you doing?' });
+      // CRITICAL: These are the most mistranslated Tamil phrases - teach the model explicitly
+      messages.push({ role: 'user', content: 'ஹாய் சார், உங்களுக்கு கேட்குதா சார்? என்ன பண்றீங்க?' });
+      messages.push({ role: 'assistant', content: 'Hi sir, can you hear me sir? What are you doing?' });
+      messages.push({ role: 'user', content: 'நான் உங்களுக்கு கேக்குதா என்ன பண்றீங்க?' });
+      messages.push({ role: 'assistant', content: 'Can you hear me? What are you doing?' });
       messages.push({ role: 'user', content: 'தலை வலிக்குது, சாப்பிடல.' });
       messages.push({ role: 'assistant', content: 'I have a headache and I have not eaten.' });
       messages.push({ role: 'user', content: 'Doctor என்ன சொன்னாங்க?' });
       messages.push({ role: 'assistant', content: 'What did the doctor say?' });
       messages.push({ role: 'user', content: 'ரெஸ்ட் எடுக்கணும்னு சொன்னாங்க.' });
       messages.push({ role: 'assistant', content: 'They said you need to rest.' });
+      messages.push({ role: 'user', content: 'சாப்பிட்டீங்களா? வலி குறைஞ்சதா?' });
+      messages.push({ role: 'assistant', content: 'Did you eat? Has the pain reduced?' });
     }
     
     messages.push({ role: 'user', content: text });
