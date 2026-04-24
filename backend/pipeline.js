@@ -1,5 +1,6 @@
 import axios from 'axios';
 import Groq from 'groq-sdk';
+import { execSync } from 'child_process';
 import os from 'os';
 import fs from 'fs';
 import path from 'path';
@@ -100,41 +101,52 @@ export async function processAudioBuffer(audioBuffer, sourceLang, targetLang, st
 }
 
 async function transcribeAudio(audioBuffer, lang) {
+  let webmPath = '';
+  let wavPath = '';
+  
   try {
-    // Decode base64 to binary
+    // 1. Decode base64 to binary
     let base64Data = audioBuffer;
     if (typeof audioBuffer === 'string' && audioBuffer.includes(';base64,')) {
       base64Data = audioBuffer.split(';base64,').pop();
     }
     const binaryBuffer = Buffer.from(base64Data, 'base64');
-
-    // Deepgram accepts WebM directly — no ffmpeg conversion needed
-    const langCode = DEEPGRAM_LANG_MAP[lang] || 'en-IN';
-    const params = new URLSearchParams({
-      model: 'nova-3',
-      language: langCode,
-      smart_format: 'true',
-      punctuate: 'true',
-    });
-
-    const response = await fetch(`https://api.deepgram.com/v1/listen?${params}`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Token ${process.env.DEEPGRAM_API_KEY}`,
-        'Content-Type': 'audio/webm',
-      },
-      body: binaryBuffer,
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Deepgram Error: ${response.status} ${errorText}`);
+    
+    // 2. Convert WebM to WAV (Sarvam requires WAV format)
+    const tempId = `audio_${Date.now()}_${Math.floor(Math.random()*1000)}`;
+    webmPath = path.join(os.tmpdir(), `${tempId}.webm`);
+    wavPath = path.join(os.tmpdir(), `${tempId}.wav`);
+    
+    fs.writeFileSync(webmPath, binaryBuffer);
+    
+    // WAV at 16kHz mono - exactly what Sarvam saaras:v3 requires
+    execSync(`ffmpeg -y -i "${webmPath}" -ar 16000 -ac 1 -sample_fmt s16 "${wavPath}"`, { stdio: 'ignore' });
+    
+    const wavBuffer = fs.readFileSync(wavPath);
+    
+    // 3. Upload to Sarvam
+    const formData = new FormData();
+    formData.append('file', wavBuffer, { filename: 'audio.wav', contentType: 'audio/wav' });
+    formData.append('model', 'saaras:v3');
+    if (SARVAM_LANG_MAP[lang]) {
+      formData.append('language_code', SARVAM_LANG_MAP[lang]);
     }
 
-    const data = await response.json();
-    return data?.results?.channels?.[0]?.alternatives?.[0]?.transcript || '';
+    const response = await axios.post('https://api.sarvam.ai/speech-to-text', formData, {
+      headers: {
+        ...formData.getHeaders(),
+        'api-subscription-key': process.env.SARVAM_API_KEY
+      }
+    });
+
+    if (fs.existsSync(webmPath)) fs.unlinkSync(webmPath);
+    if (fs.existsSync(wavPath)) fs.unlinkSync(wavPath);
+
+    return response.data.transcript || '';
   } catch (error) {
-    console.error('Deepgram STT Error:', error.message);
+    if (webmPath && fs.existsSync(webmPath)) fs.unlinkSync(webmPath);
+    if (wavPath && fs.existsSync(wavPath)) fs.unlinkSync(wavPath);
+    console.error('Sarvam STT Error:', error.response?.data || error.message);
     throw new Error('STT Failed');
   }
 }
@@ -177,12 +189,14 @@ Use natural everyday spoken Odia. NEVER use formal Odia.`;
 Use simple, polite sentences like a kind Indian doctor/nurse would speak. No American slang.`;
     }
 
-    const systemPrompt = `You are a spoken language interpreter. Translate ONLY what was said from ${sourceName} to ${targetName}.
+    const systemPrompt = `You are a professional medical interpreter. Translate between ${sourceName} and ${targetName}.
 
-RULE 1 - TRANSLATE EXACTLY: Only translate what the speaker actually said. Do NOT add, infer, or expand on anything.
-RULE 2 - COLLOQUIAL: Use natural everyday spoken dialect. NOT formal or bookish language.
-RULE 3 - OUTPUT: Print ONLY the translated text. Nothing else.
-RULE 4 - STYLE: ${langStyleRule}`;
+CRITICAL INSTRUCTIONS:
+1. ACCURACY: Capture the EXACT medical meaning. Do NOT skip words, do NOT summarize.
+2. CONTEXT: This is a medical emergency. Use natural, spoken colloquial language so the patient/doctor understands clearly.
+3. NO INJECTION: Do NOT add information that was not spoken. If the user says "Hello", only translate "Hello".
+4. STYLE: ${langStyleRule}
+5. OUTPUT: Print ONLY the translated text. No labels.`;
 
     // Build messages array with few-shot examples for Tamil to lock in spoken style
     const messages = [{ role: 'system', content: systemPrompt }];
@@ -209,22 +223,34 @@ RULE 4 - STYLE: ${langStyleRule}`;
       messages.push({ role: 'assistant', content: 'हेलो, कैसे हो सर?' });
       messages.push({ role: 'user', content: 'I have a headache, did you eat?' });
       messages.push({ role: 'assistant', content: 'सिर दर्द हो रहा है, खाना खाया?' });
+      messages.push({ role: 'user', content: 'My chest is paining and I feel dizzy.' });
+      messages.push({ role: 'assistant', content: 'मेरे सीने में दर्द है और चक्कर आ रहे हैं।' });
       messages.push({ role: 'user', content: 'What did the doctor say?' });
       messages.push({ role: 'assistant', content: 'Doctor ने क्या कहा?' });
+      messages.push({ role: 'user', content: 'Take this medicine after food and come back tomorrow.' });
+      messages.push({ role: 'assistant', content: 'खाना खाने के बाद यह दवा लें और कल वापस आएं।' });
     } else if (targetLang === 'te') {
       messages.push({ role: 'user', content: 'Hello, how are you sir?' });
       messages.push({ role: 'assistant', content: 'హలో, ఎలా ఉన్నారు సార్?' });
       messages.push({ role: 'user', content: 'I have a headache, did you eat?' });
       messages.push({ role: 'assistant', content: 'తలనొప్పిగా ఉంది, తిన్నారా?' });
+      messages.push({ role: 'user', content: 'I have severe stomach pain since morning.' });
+      messages.push({ role: 'assistant', content: 'ఉదయం నుండి కడుపులో చాలా నొప్పిగా ఉంది.' });
       messages.push({ role: 'user', content: 'What did the doctor say?' });
       messages.push({ role: 'assistant', content: 'Doctor ఏం చెప్పారు?' });
+      messages.push({ role: 'user', content: 'Please rest and drink plenty of water.' });
+      messages.push({ role: 'assistant', content: 'దయచేసి విశ్రాంతి తీసుకోండి మరియు నీళ్లు ఎక్కువగా తాగండి.' });
     } else if (targetLang === 'kn') {
       messages.push({ role: 'user', content: 'Hello, how are you sir?' });
       messages.push({ role: 'assistant', content: 'ಹಲೋ, ಹೇಗಿದ್ದೀರಾ ಸಾರ್?' });
       messages.push({ role: 'user', content: 'I have a headache, did you eat?' });
       messages.push({ role: 'assistant', content: 'ತಲೆ ನೋವಾಗ್ತಿದೆ, ಊಟ ಆಯ್ತಾ?' });
+      messages.push({ role: 'user', content: 'I feel very weak and have fever.' });
+      messages.push({ role: 'assistant', content: 'ತುಂಬಾ ಸುಸ್ತಾಗ್ತಿದೆ ಮತ್ತೆ ಜ್ವರ ಕೂಡ ಇದೆ.' });
       messages.push({ role: 'user', content: 'What did the doctor say?' });
       messages.push({ role: 'assistant', content: 'Doctor ಏನ್ ಹೇಳಿದ್ರು?' });
+      messages.push({ role: 'user', content: 'Don\'t worry, you will be fine after taking these tablets.' });
+      messages.push({ role: 'assistant', content: 'ಚಿಂತೆ ಮಾಡ್ಬೇಡಿ, ಈ ಮಾತ್ರೆ ತಗೊಂಡ ಮೇಲೆ ಗುಣ ಆಗ್ತೀರಾ.' });
     } else if (targetLang === 'ml') {
       messages.push({ role: 'user', content: 'Hello, how are you sir?' });
       messages.push({ role: 'assistant', content: 'ഹലോ, എന്താ സുഖം സർ?' });
