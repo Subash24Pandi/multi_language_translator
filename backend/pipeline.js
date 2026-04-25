@@ -34,15 +34,15 @@ const FULL_LANG_NAMES = {
   bn: 'Bengali', gu: 'Gujarati', mr: 'Marathi', ml: 'Malayalam', or: 'Odia'
 };
 
-// Set execution permissions for ffmpeg on startup
 try {
   if (ffmpeg) fs.chmodSync(ffmpeg, 0o755);
 } catch (e) {}
 
 export async function processAudioBuffer(audioBuffer, sourceLang, targetLang) {
   try {
-    // 1. STT: Sarvam AI (Requested)
+    // 1. STT: Sarvam with Deepgram Fallback
     let sttText = await transcribeAudio(audioBuffer, sourceLang);
+    
     if (!sttText || sttText.trim() === '') {
       return { audioBase64: null, translatedText: '', originalText: '' };
     }
@@ -69,25 +69,27 @@ export async function processAudioBuffer(audioBuffer, sourceLang, targetLang) {
 }
 
 async function transcribeAudio(audioBuffer, lang) {
+  try {
+    // TRY SARVAM FIRST (User preference)
+    return await transcribeSarvam(audioBuffer, lang);
+  } catch (err) {
+    console.error('Sarvam failed, falling back to Deepgram for meeting stability...');
+    // FALLBACK TO DEEPGRAM (Guaranteed to work on Render without ffmpeg)
+    return await transcribeDeepgram(audioBuffer, lang);
+  }
+}
+
+async function transcribeSarvam(audioBuffer, lang) {
   let webmPath = '';
   let wavPath = '';
   try {
     const tempId = `audio_${Date.now()}`;
     webmPath = path.join(os.tmpdir(), `${tempId}.webm`);
     wavPath = path.join(os.tmpdir(), `${tempId}.wav`);
+    fs.writeFileSync(webmPath, Buffer.from(audioBuffer));
     
-    const binaryBuffer = Buffer.isBuffer(audioBuffer) ? audioBuffer : Buffer.from(audioBuffer);
-    fs.writeFileSync(webmPath, binaryBuffer);
-    
-    // FIX: Using advanced ffmpeg flags to recover from "EBML header parsing failed" errors.
-    // -fflags +genpts+igndts+ignidx: Force generation of timestamps and ignore corrupted index/dts.
-    // -f matroska: Force input format as webm/matroska even if header is slightly off.
-    try {
-      execSync(`"${ffmpeg}" -y -f matroska -fflags +genpts+igndts+ignidx -i "${webmPath}" -preset ultrafast -ar 16000 -ac 1 -sample_fmt s16 "${wavPath}"`, { stdio: 'pipe' });
-    } catch (ffmpegErr) {
-      // Fallback: try without the force flags if that fails
-      execSync(`"${ffmpeg}" -y -i "${webmPath}" -preset ultrafast -ar 16000 -ac 1 -sample_fmt s16 "${wavPath}"`, { stdio: 'ignore' });
-    }
+    // Using advanced recovery flags
+    execSync(`"${ffmpeg}" -y -f matroska -fflags +genpts+igndts+ignidx -i "${webmPath}" -preset ultrafast -ar 16000 -ac 1 -sample_fmt s16 "${wavPath}"`, { stdio: 'pipe' });
     
     const wavBuffer = fs.readFileSync(wavPath);
     const formData = new FormData();
@@ -96,21 +98,35 @@ async function transcribeAudio(audioBuffer, lang) {
     if (SARVAM_LANG_MAP[lang]) formData.append('language_code', SARVAM_LANG_MAP[lang]);
 
     const response = await axios.post('https://api.sarvam.ai/speech-to-text', formData, {
-      headers: {
-        ...formData.getHeaders(),
-        'api-subscription-key': process.env.SARVAM_API_KEY
-      }
+      headers: { ...formData.getHeaders(), 'api-subscription-key': process.env.SARVAM_API_KEY }
     });
 
-    if (fs.existsSync(webmPath)) fs.unlinkSync(webmPath);
-    if (fs.existsSync(wavPath)) fs.unlinkSync(wavPath);
-
+    fs.unlinkSync(webmPath);
+    fs.unlinkSync(wavPath);
     return response.data.transcript || '';
   } catch (error) {
     if (webmPath && fs.existsSync(webmPath)) fs.unlinkSync(webmPath);
     if (wavPath && fs.existsSync(wavPath)) fs.unlinkSync(wavPath);
-    console.error('STT Failed Detail:', error.message);
-    throw new Error('STT Failed');
+    throw error;
+  }
+}
+
+async function transcribeDeepgram(audioBuffer, lang) {
+  try {
+    const response = await axios.post(
+      'https://api.deepgram.com/v1/listen?model=nova-2-medical&smart_format=true&language=' + (lang === 'en' ? 'en' : lang),
+      Buffer.from(audioBuffer),
+      {
+        headers: {
+          'Authorization': `Token ${process.env.DEEPGRAM_API_KEY}`,
+          'Content-Type': 'audio/webm'
+        }
+      }
+    );
+    return response.data.results?.channels[0]?.alternatives[0]?.transcript || '';
+  } catch (error) {
+    console.error('Deepgram Fallback Error:', error.response?.data || error.message);
+    throw new Error('STT_ALL_FAILED');
   }
 }
 
@@ -118,17 +134,13 @@ async function translateText(text, sourceLang, targetLang) {
   try {
     const sourceName = FULL_LANG_NAMES[sourceLang] || sourceLang;
     const targetName = FULL_LANG_NAMES[targetLang] || targetLang;
-
     const systemPrompt = `You are a medical interpreter. Translate from ${sourceName} to ${targetName}.
 RULES: Use natural spoken dialect (COLLOQUIAL). NO bookish words. 
 Keep Doctor, Hospital, BP, Sugar, Tablet, Scan, ECG, Operation in English.
 Output ONLY translation.`;
-
     const response = await groq.chat.completions.create({
       messages: [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: 'ஹாய் சார், என்ன பண்றீங்க? சாப்டீங்களா? டாக்டர் என்ன சொன்னாங்க?' },
-        { role: 'assistant', content: 'Hi sir, what are you doing? Did you eat? What did the doctor say?' },
         { role: 'user', content: text }
       ],
       model: 'llama-3.3-70b-versatile',
@@ -136,7 +148,6 @@ Output ONLY translation.`;
     });
     return response.choices[0]?.message?.content?.trim() || '';
   } catch (error) {
-    console.error('Groq Translation Error:', error.message);
     throw new Error('Translation Failed');
   }
 }
@@ -163,7 +174,6 @@ async function synthesizeSpeech(text, targetLang) {
     );
     return Buffer.from(response.data).toString('base64');
   } catch (error) {
-    console.error('Cartesia TTS Error:', error.message);
     throw new Error('TTS Failed');
   }
 }
