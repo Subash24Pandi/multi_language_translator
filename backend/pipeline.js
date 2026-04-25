@@ -152,16 +152,34 @@ async function translateText(text, sourceLang, targetLang) {
     const sourceName = FULL_LANG_NAMES[sourceLang] || sourceLang;
     const targetName = FULL_LANG_NAMES[targetLang] || targetLang;
 
-    const systemPrompt = `You are a high-precision medical translator. Translate from ${sourceName} to ${targetName}.
-RULES:
-1. ACCURACY FIRST: Never add or change meaning.
-2. COLLOQUIAL: Use natural spoken dialect (2024 style). 
-3. MEDICAL: Keep "Doctor", "BP", "Sugar" in English if common.
-4. OUTPUT ONLY TRANSLATION.`;
+    const systemPrompt = `You are a hyper-colloquial medical translator. Your goal is to translate ${sourceName} to ${targetName} so it sounds like a REAL PERSON speaking in 2024.
+
+STRICT RULES:
+1. BAN FORMAL LANGUAGE: Never use "bookish" or "textbook" words. 
+   - For Tamil: NEVER use "Neengal", "Seigireerkal", "Saapiteergala", or "Vanakkan" (unless it's a very formal greeting).
+   - Use: "Neenga", "Pannreenga", "Saaptteengala", "Hi/Hello".
+2. ACCURACY: Keep the medical meaning 100% exact.
+3. SUFFIXES: Use spoken suffixes like "-nga", "-teengala", "-reenga", "-nna".
+4. ENGLISH LOAN WORDS: Use common English words like "Doctor", "BP", "Sugar", "Tablet", "Hospital", "Report" as they are naturally used in spoken ${targetName}.
+5. NO EXPLANATIONS: Output ONLY the translated text.
+
+EXAMPLES:
+Formal: நீங்கள் உணவு உண்டீர்களா?
+Colloquial: Neenga saaptteengala? (நீங்க சாப்ட்டீங்களா?)
+
+Formal: உங்கள் இரத்த அழுத்தம் அதிகமாக உள்ளது.
+Colloquial: Unga BP konjam adhigaama irukku. (உங்க BP கொஞ்சம் அதிகமா இருக்கு.)`;
 
     const response = await groq.chat.completions.create({
       messages: [
         { role: 'system', content: systemPrompt },
+        // Expanded Few-shots
+        { role: 'user', content: 'Hi sir, how are you? Did you take your medicine?' },
+        { role: 'assistant', content: 'ஹாய் சார், எப்படி இருக்கீங்க? டேப்லெட் போட்டீங்களா?' },
+        { role: 'user', content: 'What did the doctor say about the report?' },
+        { role: 'assistant', content: 'ரிப்போர்ட் பத்தி டாக்டர் என்ன சொன்னாங்க?' },
+        { role: 'user', content: 'Are you feeling any pain now?' },
+        { role: 'assistant', content: 'இப்போ ஏதாச்சும் வலி இருக்கா?' },
         { role: 'user', content: text }
       ],
       model: 'llama-3.3-70b-versatile',

@@ -61,49 +61,43 @@ io.on('connection', (socket) => {
       const currentUser = session.users[socket.id];
       if (!currentUser) return;
       
+      // 3. Find the recipient
       const users = Object.entries(session.users);
-      // Find the user with the OPPOSITE role and DIFFERENT ID
-      const otherUserEntry = users.find(([id, user]) => id !== socket.id && user.role !== currentUser.role);
+      // Recipient is the person with the OTHER role
+      const recipientEntry = users.find(([id, user]) => id !== socket.id && user.role !== currentUser.role);
       
-      if (!otherUserEntry) {
-         console.log('No other user in session to translate for.');
+      if (!recipientEntry) {
+         console.log('No recipient found in session.');
          socket.emit('transcription_error');
          return;
       }
       
-      const [otherUserId, otherUser] = otherUserEntry;
-      const targetLanguage = otherUser.language;
+      const [recipientId, recipient] = recipientEntry;
+      const targetLanguage = recipient.language;
       const sourceLanguage = language;
       
-      console.log(`Translating from ${sourceLanguage} to ${targetLanguage}`);
+      console.log(`Pipeline: ${currentUser.role}(${sourceLanguage}) -> ${recipient.role}(${targetLanguage})`);
       
-      // Process the combined streaming audio through STT -> LLM -> TTS
-      const { audioBase64, translatedText, originalText } = await processAudioBuffer(
-        audioData, 
-        sourceLanguage, 
-        targetLanguage
-      );
+      // 4. Process through AI Pipeline
+      const result = await processAudioBuffer(audioData, sourceLanguage, targetLanguage);
       
-      if (audioBase64) {
-        // Send the translated audio and text to the recipient
-        io.to(otherUserId).emit('translated_audio', {
-           audioBase64,
-           translatedText,
-           originalText
+      if (result.translatedText || result.originalText) {
+        // Send translation to the recipient
+        io.to(recipientId).emit('translated_audio', {
+           audioBase64: result.audioBase64,
+           translatedText: result.translatedText,
+           originalText: result.originalText
         });
         
-        // Send the original text back to the sender so their "..." bubble updates
+        // Send original back to sender for their UI
         socket.emit('transcription_success', {
-           originalText
+           originalText: result.originalText
         });
       } else {
-        io.to(otherUserId).emit('processing_status', { status: 'Failed to process' });
         socket.emit('transcription_error');
       }
-      
     } catch (err) {
-      console.error('Error processing audio chunk:', err);
-      // Fallback: emit generic error to the sender so they aren't stuck on "Processing"
+      console.error('Socket Audio Error:', err.message);
       socket.emit('transcription_error');
     }
   });
