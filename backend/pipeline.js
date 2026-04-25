@@ -57,7 +57,10 @@ export async function processAudioBuffer(audioBuffer, sourceLang, targetLang) {
 
     translatedText = translatedText.replace(/^(Speaker\s*\d*\s*:|Doctor\s*:|Patient\s*:)\s*/i, '').trim();
 
+    // TTS: Cartesia
     const audioBase64 = await synthesizeSpeech(translatedText, targetLang);
+    
+    // CRITICAL: Even if TTS fails, we must return the translated text!
     return { audioBase64, translatedText, originalText: sttText };
   } catch (error) {
     console.error('Pipeline Critical Failure:', error.message);
@@ -69,7 +72,6 @@ async function transcribeAudio(audioBuffer, lang) {
   try {
     return await transcribeSarvam(audioBuffer, lang);
   } catch (err) {
-    console.error('Sarvam STT failed, trying Groq fallback...');
     try {
       return await transcribeGroq(audioBuffer, lang);
     } catch (groqErr) {
@@ -151,23 +153,15 @@ async function translateText(text, sourceLang, targetLang) {
     const targetName = FULL_LANG_NAMES[targetLang] || targetLang;
 
     const systemPrompt = `You are a high-precision medical translator. Translate from ${sourceName} to ${targetName}.
-CRITICAL RULES:
-1. ACCURACY FIRST: Never add, omit, or change the specific meaning of any word.
-2. COLLOQUIAL STYLE: Use 100% natural, modern spoken dialect (2024 style). 
-3. NO FORMALISM: Avoid all dictionary-style or bookish language.
-4. MEDICAL TERMS: Keep terms like "Doctor", "BP", "Sugar", "Hospital", "Tablet" in English if they are commonly used that way.
-5. CONTEXT: This is a real-time conversation between a doctor and patient. Use appropriate respect but keep it casual.
-6. OUTPUT ONLY THE TRANSLATED TEXT. NO EXPLANATIONS.`;
+RULES:
+1. ACCURACY FIRST: Never add or change meaning.
+2. COLLOQUIAL: Use natural spoken dialect (2024 style). 
+3. MEDICAL: Keep "Doctor", "BP", "Sugar" in English if common.
+4. OUTPUT ONLY TRANSLATION.`;
 
     const response = await groq.chat.completions.create({
       messages: [
         { role: 'system', content: systemPrompt },
-        // Few-shot for Tamil
-        { role: 'user', content: 'ஹாய் சார், என்ன பண்றீங்க? சாப்டீங்களா? டாக்டர் என்ன சொன்னாங்க?' },
-        { role: 'assistant', content: 'Hi sir, what are you doing? Did you eat? What did the doctor say?' },
-        // Few-shot for Hindi
-        { role: 'user', content: 'नमस्ते, आप कैसे हैं? डॉक्टर ने क्या बोला?' },
-        { role: 'assistant', content: 'Namaste, how are you? What did the doctor say?' },
         { role: 'user', content: text }
       ],
       model: 'llama-3.3-70b-versatile',
@@ -197,10 +191,12 @@ async function synthesizeSpeech(text, targetLang) {
           'Content-Type': 'application/json',
         },
         responseType: 'arraybuffer',
+        timeout: 5000 // Add timeout to prevent hanging
       }
     );
     return Buffer.from(response.data).toString('base64');
   } catch (error) {
+    console.error('TTS Synthesis Failed:', error.message);
     return null;
   }
 }
