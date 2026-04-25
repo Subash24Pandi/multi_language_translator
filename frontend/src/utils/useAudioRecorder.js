@@ -19,7 +19,7 @@ export function useAudioRecorder(onAudioComplete) {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
     }
-    if (audioContextRef.current) {
+    if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
       audioContextRef.current.close();
     }
     setIsRecording(false);
@@ -38,10 +38,10 @@ export function useAudioRecorder(onAudioComplete) {
       analyser.fftSize = 512;
       
       const source = audioContext.createMediaStreamSource(stream);
-      // Direct connection - no gain boost to prevent audio distortion
       source.connect(analyser);
       
-      const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+      // Use standard MediaRecorder but with a fallback to ensure headers are always present
+      const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
       
@@ -51,18 +51,25 @@ export function useAudioRecorder(onAudioComplete) {
         }
       };
       
-      mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+      mediaRecorder.onstop = async () => {
+        if (audioChunksRef.current.length === 0) return;
+        
+        // Combine chunks into a single Blob
+        const audioBlob = new Blob(audioChunksRef.current, { type: mediaRecorder.mimeType });
+        
+        // Verification: If the blob is too small, it's likely a misfire
+        if (audioBlob.size < 1000) return; 
+
         if (onAudioComplete) {
             onAudioComplete(audioBlob);
         }
       };
       
-      mediaRecorder.start(200);
+      // Start without timeslice to ensure a single consistent header at the start
+      mediaRecorder.start();
       setIsRecording(true);
       
       const dataArray = new Uint8Array(analyser.frequencyBinCount);
-      
       const checkSilence = () => {
         if (!mediaRecorderRef.current || mediaRecorderRef.current.state !== 'recording') return;
         
@@ -85,12 +92,10 @@ export function useAudioRecorder(onAudioComplete) {
             silenceTimerRef.current = null;
           }
         }
-        
         requestAnimationFrame(checkSilence);
       };
       
       checkSilence();
-      
     } catch (err) {
       console.error("Error accessing microphone:", err);
     }
