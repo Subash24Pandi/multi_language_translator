@@ -23,22 +23,19 @@ const VOICE_MAP = {
   or: 'faf0731e-dfb9-4cfc-8119-259a79b27e12', 
 };
 
+const SARVAM_LANG_MAP = {
+  en: 'en-IN', hi: 'hi-IN', ta: 'ta-IN', te: 'te-IN', kn: 'kn-IN', 
+  bn: 'bn-IN', gu: 'gu-IN', mr: 'mr-IN', ml: 'ml-IN', or: 'or-IN'
+};
+
 const FULL_LANG_NAMES = {
-  en: 'English',
-  hi: 'Hindi',
-  ta: 'Tamil',
-  te: 'Telugu',
-  kn: 'Kannada',
-  bn: 'Bengali',
-  gu: 'Gujarati',
-  mr: 'Marathi',
-  ml: 'Malayalam',
-  or: 'Odia'
+  en: 'English', hi: 'Hindi', ta: 'Tamil', te: 'Telugu', kn: 'Kannada',
+  bn: 'Bengali', gu: 'Gujarati', mr: 'Marathi', ml: 'Malayalam', or: 'Odia'
 };
 
 export async function processAudioBuffer(audioBuffer, sourceLang, targetLang) {
   try {
-    // STT: Using Groq Whisper for maximum speed and zero server dependencies (No ffmpeg needed)
+    // 1. STT: Sarvam AI (Requested for Indian Languages)
     let sttText = await transcribeAudio(audioBuffer, sourceLang);
     if (!sttText || sttText.trim() === '') {
       return { audioBase64: null, translatedText: '', originalText: '' };
@@ -47,7 +44,7 @@ export async function processAudioBuffer(audioBuffer, sourceLang, targetLang) {
     sttText = sttText.replace(/^(Speaker\s*\d*\s*:|Doctor\s*:|Patient\s*:)\s*/i, '').trim();
     console.log(`[STT] Transcribed: ${sttText}`);
 
-    // LLM: Groq Translation (Llama 3.3 70B)
+    // 2. LLM: Groq Translation (Llama 3.3 70B - Colloquial First)
     let translatedText = sttText;
     if (sourceLang !== targetLang) {
       translatedText = await translateText(sttText, sourceLang, targetLang);
@@ -56,7 +53,7 @@ export async function processAudioBuffer(audioBuffer, sourceLang, targetLang) {
 
     translatedText = translatedText.replace(/^(Speaker\s*\d*\s*:|Doctor\s*:|Patient\s*:)\s*/i, '').trim();
 
-    // TTS: Cartesia
+    // 3. TTS: Cartesia
     const audioBase64 = await synthesizeSpeech(translatedText, targetLang);
     return { audioBase64, translatedText, originalText: sttText };
   } catch (error) {
@@ -66,26 +63,48 @@ export async function processAudioBuffer(audioBuffer, sourceLang, targetLang) {
 }
 
 async function transcribeAudio(audioBuffer, lang) {
-  let tempPath = '';
+  let webmPath = '';
+  let wavPath = '';
   try {
-    const binaryBuffer = Buffer.isBuffer(audioBuffer) ? audioBuffer : Buffer.from(audioBuffer);
+    const tempId = `audio_${Date.now()}`;
+    webmPath = path.join(os.tmpdir(), `${tempId}.webm`);
+    wavPath = path.join(os.tmpdir(), `${tempId}.wav`);
     
-    // We MUST use a .webm extension so Groq's API recognizes the file format
-    tempPath = path.join(os.tmpdir(), `input_${Date.now()}.webm`);
-    fs.writeFileSync(tempPath, binaryBuffer);
+    const binaryBuffer = Buffer.isBuffer(audioBuffer) ? audioBuffer : Buffer.from(audioBuffer);
+    fs.writeFileSync(webmPath, binaryBuffer);
+    
+    // Check for local ffmpeg (downloaded by build command) or system ffmpeg
+    const ffmpegPath = fs.existsSync('./ffmpeg') ? './ffmpeg' : 'ffmpeg';
+    
+    try {
+      execSync(`${ffmpegPath} -y -i "${webmPath}" -preset ultrafast -ar 16000 -ac 1 -sample_fmt s16 "${wavPath}"`, { stdio: 'ignore' });
+    } catch (ffmpegErr) {
+      console.error("FFMPEG Error: Please ensure ffmpeg is installed on your system/server.");
+      throw new Error("FFMPEG_MISSING");
+    }
+    
+    const wavBuffer = fs.readFileSync(wavPath);
+    const formData = new FormData();
+    formData.append('file', wavBuffer, { filename: 'audio.wav', contentType: 'audio/wav' });
+    formData.append('model', 'saaras:v3');
+    if (SARVAM_LANG_MAP[lang]) formData.append('language_code', SARVAM_LANG_MAP[lang]);
 
-    const transcription = await groq.audio.transcriptions.create({
-      file: fs.createReadStream(tempPath),
-      model: 'whisper-large-v3',
-      language: lang,
-      response_format: 'json',
+    const response = await axios.post('https://api.sarvam.ai/speech-to-text', formData, {
+      headers: {
+        ...formData.getHeaders(),
+        'api-subscription-key': process.env.SARVAM_API_KEY
+      }
     });
 
-    if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
-    return transcription.text || '';
+    if (fs.existsSync(webmPath)) fs.unlinkSync(webmPath);
+    if (fs.existsSync(wavPath)) fs.unlinkSync(wavPath);
+
+    return response.data.transcript || '';
   } catch (error) {
-    if (tempPath && fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
-    console.error('Groq STT Error:', error.message);
+    if (webmPath && fs.existsSync(webmPath)) fs.unlinkSync(webmPath);
+    if (wavPath && fs.existsSync(wavPath)) fs.unlinkSync(wavPath);
+    if (error.message === "FFMPEG_MISSING") throw error;
+    console.error('Sarvam STT Error:', error.response?.data || error.message);
     throw new Error('STT Failed');
   }
 }
@@ -96,15 +115,13 @@ async function translateText(text, sourceLang, targetLang) {
     const targetName = FULL_LANG_NAMES[targetLang] || targetLang;
 
     const systemPrompt = `You are a professional medical interpreter translating from ${sourceName} to ${targetName}.
-
-STRICT DIALECT RULES:
-1. USE COLLOQUIAL SPEECH ONLY: Your output MUST be in natural, modern, 2024 spoken dialect.
-2. NO FORMAL LANGUAGE: Strictly avoid "Thuya" Tamil, "Shuddh" Hindi, or any "bookish" / formal written grammar.
-3. SPOKEN STYLE: Use casual/natural tones (e.g., "Pannreenga", "Saptteengala").
-4. MEDICAL FIDELITY: Maintain 100% meaning accuracy while using colloquial style.
-5. ENGLISH TERMS: Keep clinical terms like Doctor, Hospital, BP, Sugar, Tablet, Scan, ECG, Operation in English.
-6. PRONOUNS: Use "You" for direct address. Use "They" for doctors/staff.
-7. CLEAN OUTPUT: Output ONLY the translation.`;
+STRICT COLLOQUIAL RULES:
+1. USE MODERN 2024 SPOKEN DIALECT ONLY. 
+2. AVOID ALL FORMAL/BOOKISH/THUYA LANGUAGE.
+3. SPOKEN STYLE: Use casual, natural tones (e.g., "Pannreenga", "Saptteengala").
+4. MEDICAL FIDELITY: Maintain 100% meaning accuracy while being casual.
+5. ENGLISH TERMS: Keep Doctor, Hospital, BP, Sugar, Tablet, Scan, ECG, Operation in English.
+6. OUTPUT ONLY THE TRANSLATION.`;
 
     const response = await groq.chat.completions.create({
       messages: [
@@ -115,9 +132,7 @@ STRICT DIALECT RULES:
       ],
       model: 'llama-3.3-70b-versatile',
       temperature: 0,
-      max_tokens: 1024,
     });
-    
     return response.choices[0]?.message?.content?.trim() || '';
   } catch (error) {
     console.error('Groq Translation Error:', error.message);
