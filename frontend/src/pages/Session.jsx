@@ -130,7 +130,7 @@ export default function Session() {
           pending: true
         }]);
       };
-      reader.readAsDataURL(blob);
+      reader.readAsArrayBuffer(blob);
     } catch (err) {
       console.error('Failed to send audio:', err);
       setStatus('Ready');
