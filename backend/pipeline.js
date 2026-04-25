@@ -34,19 +34,14 @@ const FULL_LANG_NAMES = {
   bn: 'Bengali', gu: 'Gujarati', mr: 'Marathi', ml: 'Malayalam', or: 'Odia'
 };
 
-// CRITICAL: Set execution permissions for ffmpeg on Render
+// Set execution permissions for ffmpeg on startup
 try {
-  if (ffmpeg) {
-    fs.chmodSync(ffmpeg, 0o755);
-    console.log('FFMPEG permissions set successfully');
-  }
-} catch (e) {
-  console.error('Failed to set FFMPEG permissions:', e.message);
-}
+  if (ffmpeg) fs.chmodSync(ffmpeg, 0o755);
+} catch (e) {}
 
 export async function processAudioBuffer(audioBuffer, sourceLang, targetLang) {
   try {
-    // 1. STT: Sarvam AI (Now with fixed permissions and robust conversion)
+    // 1. STT: Sarvam AI (Requested)
     let sttText = await transcribeAudio(audioBuffer, sourceLang);
     if (!sttText || sttText.trim() === '') {
       return { audioBase64: null, translatedText: '', originalText: '' };
@@ -55,7 +50,7 @@ export async function processAudioBuffer(audioBuffer, sourceLang, targetLang) {
     sttText = sttText.replace(/^(Speaker\s*\d*\s*:|Doctor\s*:|Patient\s*:)\s*/i, '').trim();
     console.log(`[STT] Transcribed: ${sttText}`);
 
-    // 2. LLM: Groq Translation (Llama 3.3 70B - Colloquial Mode)
+    // 2. LLM: Groq Translation (Llama 3.3 70B - Colloquial First)
     let translatedText = sttText;
     if (sourceLang !== targetLang) {
       translatedText = await translateText(sttText, sourceLang, targetLang);
@@ -81,18 +76,17 @@ async function transcribeAudio(audioBuffer, lang) {
     webmPath = path.join(os.tmpdir(), `${tempId}.webm`);
     wavPath = path.join(os.tmpdir(), `${tempId}.wav`);
     
-    // Convert input to Buffer correctly
     const binaryBuffer = Buffer.isBuffer(audioBuffer) ? audioBuffer : Buffer.from(audioBuffer);
-    if (binaryBuffer.length < 100) throw new Error('Audio too short');
-    
     fs.writeFileSync(webmPath, binaryBuffer);
     
-    // Execute conversion with explicit path and error catching
+    // FIX: Using advanced ffmpeg flags to recover from "EBML header parsing failed" errors.
+    // -fflags +genpts+igndts+ignidx: Force generation of timestamps and ignore corrupted index/dts.
+    // -f matroska: Force input format as webm/matroska even if header is slightly off.
     try {
-      execSync(`"${ffmpeg}" -y -i "${webmPath}" -preset ultrafast -ar 16000 -ac 1 -sample_fmt s16 "${wavPath}"`, { stdio: 'pipe' });
+      execSync(`"${ffmpeg}" -y -f matroska -fflags +genpts+igndts+ignidx -i "${webmPath}" -preset ultrafast -ar 16000 -ac 1 -sample_fmt s16 "${wavPath}"`, { stdio: 'pipe' });
     } catch (ffmpegErr) {
-      console.error('FFMPEG Execution Failed:', ffmpegErr.stderr?.toString() || ffmpegErr.message);
-      throw new Error('FFMPEG_FAILED');
+      // Fallback: try without the force flags if that fails
+      execSync(`"${ffmpeg}" -y -i "${webmPath}" -preset ultrafast -ar 16000 -ac 1 -sample_fmt s16 "${wavPath}"`, { stdio: 'ignore' });
     }
     
     const wavBuffer = fs.readFileSync(wavPath);
@@ -126,7 +120,7 @@ async function translateText(text, sourceLang, targetLang) {
     const targetName = FULL_LANG_NAMES[targetLang] || targetLang;
 
     const systemPrompt = `You are a medical interpreter. Translate from ${sourceName} to ${targetName}.
-STRICT COLLOQUIAL RULES: Use natural spoken 2024 dialect. No formal/bookish words. 
+RULES: Use natural spoken dialect (COLLOQUIAL). NO bookish words. 
 Keep Doctor, Hospital, BP, Sugar, Tablet, Scan, ECG, Operation in English.
 Output ONLY translation.`;
 
