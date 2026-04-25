@@ -6,6 +6,7 @@ import fs from 'fs';
 import path from 'path';
 import FormData from 'form-data';
 import dotenv from 'dotenv';
+import ffmpeg from 'ffmpeg-static'; // Automatically provides the correct binary for Render/Linux
 dotenv.config();
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
@@ -35,7 +36,7 @@ const FULL_LANG_NAMES = {
 
 export async function processAudioBuffer(audioBuffer, sourceLang, targetLang) {
   try {
-    // 1. STT: Sarvam AI (Requested for Indian Languages)
+    // 1. STT: Sarvam AI (Restored with ffmpeg-static)
     let sttText = await transcribeAudio(audioBuffer, sourceLang);
     if (!sttText || sttText.trim() === '') {
       return { audioBase64: null, translatedText: '', originalText: '' };
@@ -73,15 +74,8 @@ async function transcribeAudio(audioBuffer, lang) {
     const binaryBuffer = Buffer.isBuffer(audioBuffer) ? audioBuffer : Buffer.from(audioBuffer);
     fs.writeFileSync(webmPath, binaryBuffer);
     
-    // Check for local ffmpeg (downloaded by build command) or system ffmpeg
-    const ffmpegPath = fs.existsSync('./ffmpeg') ? './ffmpeg' : 'ffmpeg';
-    
-    try {
-      execSync(`${ffmpegPath} -y -i "${webmPath}" -preset ultrafast -ar 16000 -ac 1 -sample_fmt s16 "${wavPath}"`, { stdio: 'ignore' });
-    } catch (ffmpegErr) {
-      console.error("FFMPEG Error: Please ensure ffmpeg is installed on your system/server.");
-      throw new Error("FFMPEG_MISSING");
-    }
+    // Using the static ffmpeg binary provided by the ffmpeg-static package
+    execSync(`"${ffmpeg}" -y -i "${webmPath}" -preset ultrafast -ar 16000 -ac 1 -sample_fmt s16 "${wavPath}"`, { stdio: 'ignore' });
     
     const wavBuffer = fs.readFileSync(wavPath);
     const formData = new FormData();
@@ -103,7 +97,6 @@ async function transcribeAudio(audioBuffer, lang) {
   } catch (error) {
     if (webmPath && fs.existsSync(webmPath)) fs.unlinkSync(webmPath);
     if (wavPath && fs.existsSync(wavPath)) fs.unlinkSync(wavPath);
-    if (error.message === "FFMPEG_MISSING") throw error;
     console.error('Sarvam STT Error:', error.response?.data || error.message);
     throw new Error('STT Failed');
   }
