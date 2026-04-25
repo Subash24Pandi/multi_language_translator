@@ -40,7 +40,6 @@ try {
 
 export async function processAudioBuffer(audioBuffer, sourceLang, targetLang) {
   try {
-    // 1. STT: Multi-Stage Fallback (Sarvam -> Groq -> Deepgram)
     let sttText = await transcribeAudio(audioBuffer, sourceLang);
     
     if (!sttText || sttText.trim() === '') {
@@ -50,7 +49,6 @@ export async function processAudioBuffer(audioBuffer, sourceLang, targetLang) {
     sttText = sttText.replace(/^(Speaker\s*\d*\s*:|Doctor\s*:|Patient\s*:)\s*/i, '').trim();
     console.log(`[STT] Final Transcription: ${sttText}`);
 
-    // 2. LLM: Groq Translation (Llama 3.3 70B - Colloquial First)
     let translatedText = sttText;
     if (sourceLang !== targetLang) {
       translatedText = await translateText(sttText, sourceLang, targetLang);
@@ -59,7 +57,6 @@ export async function processAudioBuffer(audioBuffer, sourceLang, targetLang) {
 
     translatedText = translatedText.replace(/^(Speaker\s*\d*\s*:|Doctor\s*:|Patient\s*:)\s*/i, '').trim();
 
-    // 3. TTS: Cartesia
     const audioBase64 = await synthesizeSpeech(translatedText, targetLang);
     return { audioBase64, translatedText, originalText: sttText };
   } catch (error) {
@@ -69,19 +66,13 @@ export async function processAudioBuffer(audioBuffer, sourceLang, targetLang) {
 }
 
 async function transcribeAudio(audioBuffer, lang) {
-  // STAGE 1: Try Sarvam (Requested)
   try {
     return await transcribeSarvam(audioBuffer, lang);
   } catch (err) {
-    console.error('Sarvam STT failed, trying Stage 2 (Groq Whisper)...');
-    
-    // STAGE 2: Try Groq Whisper (Fixed Filename Logic)
+    console.error('Sarvam STT failed, trying Groq fallback...');
     try {
       return await transcribeGroq(audioBuffer, lang);
     } catch (groqErr) {
-      console.error('Groq STT failed, trying Stage 3 (Deepgram Basic)...');
-      
-      // STAGE 3: Try Deepgram Basic (No medical tier to avoid 400 errors)
       return await transcribeDeepgram(audioBuffer, lang);
     }
   }
@@ -96,7 +87,6 @@ async function transcribeSarvam(audioBuffer, lang) {
     wavPath = path.join(os.tmpdir(), `${tempId}.wav`);
     fs.writeFileSync(webmPath, Buffer.from(audioBuffer));
     
-    // Recovery flags for ffmpeg
     execSync(`"${ffmpeg}" -y -f matroska -fflags +genpts+igndts+ignidx -i "${webmPath}" -preset ultrafast -ar 16000 -ac 1 -sample_fmt s16 "${wavPath}"`, { stdio: 'pipe' });
     
     const wavBuffer = fs.readFileSync(wavPath);
@@ -109,8 +99,8 @@ async function transcribeSarvam(audioBuffer, lang) {
       headers: { ...formData.getHeaders(), 'api-subscription-key': process.env.SARVAM_API_KEY }
     });
 
-    fs.unlinkSync(webmPath);
-    fs.unlinkSync(wavPath);
+    if (fs.existsSync(webmPath)) fs.unlinkSync(webmPath);
+    if (fs.existsSync(wavPath)) fs.unlinkSync(wavPath);
     return response.data.transcript || '';
   } catch (error) {
     if (webmPath && fs.existsSync(webmPath)) fs.unlinkSync(webmPath);
@@ -129,7 +119,7 @@ async function transcribeGroq(audioBuffer, lang) {
       model: 'whisper-large-v3',
       language: lang,
     });
-    fs.unlinkSync(tempPath);
+    if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
     return transcription.text || '';
   } catch (err) {
     if (tempPath && fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
@@ -139,7 +129,6 @@ async function transcribeGroq(audioBuffer, lang) {
 
 async function transcribeDeepgram(audioBuffer, lang) {
   try {
-    // No medical/nova tier - just standard models to ensure it never fails
     const response = await axios.post(
       'https://api.deepgram.com/v1/listen?smart_format=true&language=' + (lang === 'en' ? 'en' : lang),
       Buffer.from(audioBuffer),
@@ -160,13 +149,25 @@ async function translateText(text, sourceLang, targetLang) {
   try {
     const sourceName = FULL_LANG_NAMES[sourceLang] || sourceLang;
     const targetName = FULL_LANG_NAMES[targetLang] || targetLang;
-    const systemPrompt = `You are a medical interpreter. Translate from ${sourceName} to ${targetName}.
-STRICT COLLOQUIAL RULES: Use natural spoken 2024 dialect. No formal/bookish words. 
-Keep Doctor, Hospital, BP, Sugar, Tablet, Scan, ECG, Operation in English.
-Output ONLY translation.`;
+
+    const systemPrompt = `You are a high-precision medical translator. Translate from ${sourceName} to ${targetName}.
+CRITICAL RULES:
+1. ACCURACY FIRST: Never add, omit, or change the specific meaning of any word.
+2. COLLOQUIAL STYLE: Use 100% natural, modern spoken dialect (2024 style). 
+3. NO FORMALISM: Avoid all dictionary-style or bookish language.
+4. MEDICAL TERMS: Keep terms like "Doctor", "BP", "Sugar", "Hospital", "Tablet" in English if they are commonly used that way.
+5. CONTEXT: This is a real-time conversation between a doctor and patient. Use appropriate respect but keep it casual.
+6. OUTPUT ONLY THE TRANSLATED TEXT. NO EXPLANATIONS.`;
+
     const response = await groq.chat.completions.create({
       messages: [
         { role: 'system', content: systemPrompt },
+        // Few-shot for Tamil
+        { role: 'user', content: 'ஹாய் சார், என்ன பண்றீங்க? சாப்டீங்களா? டாக்டர் என்ன சொன்னாங்க?' },
+        { role: 'assistant', content: 'Hi sir, what are you doing? Did you eat? What did the doctor say?' },
+        // Few-shot for Hindi
+        { role: 'user', content: 'नमस्ते, आप कैसे हैं? डॉक्टर ने क्या बोला?' },
+        { role: 'assistant', content: 'Namaste, how are you? What did the doctor say?' },
         { role: 'user', content: text }
       ],
       model: 'llama-3.3-70b-versatile',
@@ -174,7 +175,7 @@ Output ONLY translation.`;
     });
     return response.choices[0]?.message?.content?.trim() || '';
   } catch (error) {
-    return text; // Return original as absolute last resort
+    return text;
   }
 }
 
