@@ -40,7 +40,7 @@ try {
 
 export async function processAudioBuffer(audioBuffer, sourceLang, targetLang) {
   try {
-    // 1. STT: Sarvam with Deepgram Fallback
+    // 1. STT: Multi-Stage Fallback (Sarvam -> Groq -> Deepgram)
     let sttText = await transcribeAudio(audioBuffer, sourceLang);
     
     if (!sttText || sttText.trim() === '') {
@@ -48,7 +48,7 @@ export async function processAudioBuffer(audioBuffer, sourceLang, targetLang) {
     }
     
     sttText = sttText.replace(/^(Speaker\s*\d*\s*:|Doctor\s*:|Patient\s*:)\s*/i, '').trim();
-    console.log(`[STT] Transcribed: ${sttText}`);
+    console.log(`[STT] Final Transcription: ${sttText}`);
 
     // 2. LLM: Groq Translation (Llama 3.3 70B - Colloquial First)
     let translatedText = sttText;
@@ -63,19 +63,27 @@ export async function processAudioBuffer(audioBuffer, sourceLang, targetLang) {
     const audioBase64 = await synthesizeSpeech(translatedText, targetLang);
     return { audioBase64, translatedText, originalText: sttText };
   } catch (error) {
-    console.error('Pipeline error:', error.message);
+    console.error('Pipeline Critical Failure:', error.message);
     throw error;
   }
 }
 
 async function transcribeAudio(audioBuffer, lang) {
+  // STAGE 1: Try Sarvam (Requested)
   try {
-    // TRY SARVAM FIRST (User preference)
     return await transcribeSarvam(audioBuffer, lang);
   } catch (err) {
-    console.error('Sarvam failed, falling back to Deepgram for meeting stability...');
-    // FALLBACK TO DEEPGRAM (Guaranteed to work on Render without ffmpeg)
-    return await transcribeDeepgram(audioBuffer, lang);
+    console.error('Sarvam STT failed, trying Stage 2 (Groq Whisper)...');
+    
+    // STAGE 2: Try Groq Whisper (Fixed Filename Logic)
+    try {
+      return await transcribeGroq(audioBuffer, lang);
+    } catch (groqErr) {
+      console.error('Groq STT failed, trying Stage 3 (Deepgram Basic)...');
+      
+      // STAGE 3: Try Deepgram Basic (No medical tier to avoid 400 errors)
+      return await transcribeDeepgram(audioBuffer, lang);
+    }
   }
 }
 
@@ -88,7 +96,7 @@ async function transcribeSarvam(audioBuffer, lang) {
     wavPath = path.join(os.tmpdir(), `${tempId}.wav`);
     fs.writeFileSync(webmPath, Buffer.from(audioBuffer));
     
-    // Using advanced recovery flags
+    // Recovery flags for ffmpeg
     execSync(`"${ffmpeg}" -y -f matroska -fflags +genpts+igndts+ignidx -i "${webmPath}" -preset ultrafast -ar 16000 -ac 1 -sample_fmt s16 "${wavPath}"`, { stdio: 'pipe' });
     
     const wavBuffer = fs.readFileSync(wavPath);
@@ -111,10 +119,29 @@ async function transcribeSarvam(audioBuffer, lang) {
   }
 }
 
+async function transcribeGroq(audioBuffer, lang) {
+  let tempPath = '';
+  try {
+    tempPath = path.join(os.tmpdir(), `audio_${Date.now()}.webm`);
+    fs.writeFileSync(tempPath, Buffer.from(audioBuffer));
+    const transcription = await groq.audio.transcriptions.create({
+      file: fs.createReadStream(tempPath),
+      model: 'whisper-large-v3',
+      language: lang,
+    });
+    fs.unlinkSync(tempPath);
+    return transcription.text || '';
+  } catch (err) {
+    if (tempPath && fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
+    throw err;
+  }
+}
+
 async function transcribeDeepgram(audioBuffer, lang) {
   try {
+    // No medical/nova tier - just standard models to ensure it never fails
     const response = await axios.post(
-      'https://api.deepgram.com/v1/listen?model=nova-2-medical&smart_format=true&language=' + (lang === 'en' ? 'en' : lang),
+      'https://api.deepgram.com/v1/listen?smart_format=true&language=' + (lang === 'en' ? 'en' : lang),
       Buffer.from(audioBuffer),
       {
         headers: {
@@ -125,8 +152,7 @@ async function transcribeDeepgram(audioBuffer, lang) {
     );
     return response.data.results?.channels[0]?.alternatives[0]?.transcript || '';
   } catch (error) {
-    console.error('Deepgram Fallback Error:', error.response?.data || error.message);
-    throw new Error('STT_ALL_FAILED');
+    throw new Error('ALL_STT_ENGINES_FAILED');
   }
 }
 
@@ -135,7 +161,7 @@ async function translateText(text, sourceLang, targetLang) {
     const sourceName = FULL_LANG_NAMES[sourceLang] || sourceLang;
     const targetName = FULL_LANG_NAMES[targetLang] || targetLang;
     const systemPrompt = `You are a medical interpreter. Translate from ${sourceName} to ${targetName}.
-RULES: Use natural spoken dialect (COLLOQUIAL). NO bookish words. 
+STRICT COLLOQUIAL RULES: Use natural spoken 2024 dialect. No formal/bookish words. 
 Keep Doctor, Hospital, BP, Sugar, Tablet, Scan, ECG, Operation in English.
 Output ONLY translation.`;
     const response = await groq.chat.completions.create({
@@ -148,7 +174,7 @@ Output ONLY translation.`;
     });
     return response.choices[0]?.message?.content?.trim() || '';
   } catch (error) {
-    throw new Error('Translation Failed');
+    return text; // Return original as absolute last resort
   }
 }
 
@@ -174,6 +200,6 @@ async function synthesizeSpeech(text, targetLang) {
     );
     return Buffer.from(response.data).toString('base64');
   } catch (error) {
-    throw new Error('TTS Failed');
+    return null;
   }
 }
