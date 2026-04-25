@@ -6,7 +6,7 @@ import fs from 'fs';
 import path from 'path';
 import FormData from 'form-data';
 import dotenv from 'dotenv';
-import ffmpeg from 'ffmpeg-static'; // Automatically provides the correct binary for Render/Linux
+import ffmpeg from 'ffmpeg-static';
 dotenv.config();
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
@@ -24,11 +24,6 @@ const VOICE_MAP = {
   or: 'faf0731e-dfb9-4cfc-8119-259a79b27e12', 
 };
 
-const SARVAM_LANG_MAP = {
-  en: 'en-IN', hi: 'hi-IN', ta: 'ta-IN', te: 'te-IN', kn: 'kn-IN', 
-  bn: 'bn-IN', gu: 'gu-IN', mr: 'mr-IN', ml: 'ml-IN', or: 'or-IN'
-};
-
 const FULL_LANG_NAMES = {
   en: 'English', hi: 'Hindi', ta: 'Tamil', te: 'Telugu', kn: 'Kannada',
   bn: 'Bengali', gu: 'Gujarati', mr: 'Marathi', ml: 'Malayalam', or: 'Odia'
@@ -36,7 +31,8 @@ const FULL_LANG_NAMES = {
 
 export async function processAudioBuffer(audioBuffer, sourceLang, targetLang) {
   try {
-    // 1. STT: Sarvam AI (Restored with ffmpeg-static)
+    // EMERGENCY FALLBACK: Using Groq Whisper because Sarvam/ffmpeg is crashing on Render.
+    // This ensures your meeting works right now.
     let sttText = await transcribeAudio(audioBuffer, sourceLang);
     if (!sttText || sttText.trim() === '') {
       return { audioBase64: null, translatedText: '', originalText: '' };
@@ -45,7 +41,7 @@ export async function processAudioBuffer(audioBuffer, sourceLang, targetLang) {
     sttText = sttText.replace(/^(Speaker\s*\d*\s*:|Doctor\s*:|Patient\s*:)\s*/i, '').trim();
     console.log(`[STT] Transcribed: ${sttText}`);
 
-    // 2. LLM: Groq Translation (Llama 3.3 70B - Colloquial First)
+    // LLM: Groq Translation (70B Colloquial Mode)
     let translatedText = sttText;
     if (sourceLang !== targetLang) {
       translatedText = await translateText(sttText, sourceLang, targetLang);
@@ -54,7 +50,7 @@ export async function processAudioBuffer(audioBuffer, sourceLang, targetLang) {
 
     translatedText = translatedText.replace(/^(Speaker\s*\d*\s*:|Doctor\s*:|Patient\s*:)\s*/i, '').trim();
 
-    // 3. TTS: Cartesia
+    // TTS: Cartesia
     const audioBase64 = await synthesizeSpeech(translatedText, targetLang);
     return { audioBase64, translatedText, originalText: sttText };
   } catch (error) {
@@ -64,40 +60,25 @@ export async function processAudioBuffer(audioBuffer, sourceLang, targetLang) {
 }
 
 async function transcribeAudio(audioBuffer, lang) {
-  let webmPath = '';
-  let wavPath = '';
+  let tempPath = '';
   try {
-    const tempId = `audio_${Date.now()}`;
-    webmPath = path.join(os.tmpdir(), `${tempId}.webm`);
-    wavPath = path.join(os.tmpdir(), `${tempId}.wav`);
-    
     const binaryBuffer = Buffer.isBuffer(audioBuffer) ? audioBuffer : Buffer.from(audioBuffer);
-    fs.writeFileSync(webmPath, binaryBuffer);
     
-    // Using the static ffmpeg binary provided by the ffmpeg-static package
-    execSync(`"${ffmpeg}" -y -i "${webmPath}" -preset ultrafast -ar 16000 -ac 1 -sample_fmt s16 "${wavPath}"`, { stdio: 'ignore' });
-    
-    const wavBuffer = fs.readFileSync(wavPath);
-    const formData = new FormData();
-    formData.append('file', wavBuffer, { filename: 'audio.wav', contentType: 'audio/wav' });
-    formData.append('model', 'saaras:v3');
-    if (SARVAM_LANG_MAP[lang]) formData.append('language_code', SARVAM_LANG_MAP[lang]);
+    // Whisper is extremely good at Tamil/Hindi and requires no ffmpeg.
+    tempPath = path.join(os.tmpdir(), `input_${Date.now()}.webm`);
+    fs.writeFileSync(tempPath, binaryBuffer);
 
-    const response = await axios.post('https://api.sarvam.ai/speech-to-text', formData, {
-      headers: {
-        ...formData.getHeaders(),
-        'api-subscription-key': process.env.SARVAM_API_KEY
-      }
+    const transcription = await groq.audio.transcriptions.create({
+      file: fs.createReadStream(tempPath),
+      model: 'whisper-large-v3',
+      language: lang,
     });
 
-    if (fs.existsSync(webmPath)) fs.unlinkSync(webmPath);
-    if (fs.existsSync(wavPath)) fs.unlinkSync(wavPath);
-
-    return response.data.transcript || '';
+    if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
+    return transcription.text || '';
   } catch (error) {
-    if (webmPath && fs.existsSync(webmPath)) fs.unlinkSync(webmPath);
-    if (wavPath && fs.existsSync(wavPath)) fs.unlinkSync(wavPath);
-    console.error('Sarvam STT Error:', error.response?.data || error.message);
+    if (tempPath && fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
+    console.error('STT Error:', error.message);
     throw new Error('STT Failed');
   }
 }
@@ -111,8 +92,8 @@ async function translateText(text, sourceLang, targetLang) {
 STRICT COLLOQUIAL RULES:
 1. USE MODERN 2024 SPOKEN DIALECT ONLY. 
 2. AVOID ALL FORMAL/BOOKISH/THUYA LANGUAGE.
-3. SPOKEN STYLE: Use casual, natural tones (e.g., "Pannreenga", "Saptteengala").
-4. MEDICAL FIDELITY: Maintain 100% meaning accuracy while being casual.
+3. SPOKEN STYLE: Use natural, spoken tones (e.g., "Pannreenga", "Saptteengala").
+4. MEDICAL FIDELITY: Maintain 100% meaning accuracy while being colloquial.
 5. ENGLISH TERMS: Keep Doctor, Hospital, BP, Sugar, Tablet, Scan, ECG, Operation in English.
 6. OUTPUT ONLY THE TRANSLATION.`;
 
